@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Choice {
+  A
+  B
+  C
+  D
+}
+
+enum WrongNoteStatus {
+  ACTIVE
+  RESOLVED
+}
+
+model QuestionSet {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  questions   Question[]
+  attempts    Attempt[]
+}
+
+model Question {
+  id          String      @id @default(cuid())
+  setId       String
+  prompt      String
+  choiceA     String
+  choiceB     String
+  choiceC     String
+  choiceD     String
+  correct     Choice
+  explanation String
+  tag         String?
+  category    String?
+  order       Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  set         QuestionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  attempts    Attempt[]
+  wrongNote   WrongNote?
+
+  @@index([setId, order])
+}
+
+model Attempt {
+  id         String      @id @default(cuid())
+  questionId String
+  setId      String
+  selected   Choice
+  isCorrect  Boolean
+  answeredAt DateTime    @default(now())
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  set        QuestionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([setId, answeredAt])
+}
+
+model WrongNote {
+  id           String          @id @default(cuid())
+  questionId   String          @unique
+  wrongCount   Int             @default(1)
+  lastWrongAt  DateTime        @default(now())
+  reviewedAt   DateTime?
+  status       WrongNoteStatus @default(ACTIVE)
+  dueAt        DateTime?
+  intervalDays Int             @default(0)
+  easeFactor   Float           @default(2.5)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  question     Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([status, lastWrongAt])
+  @@index([dueAt])
+}
