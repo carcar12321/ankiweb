@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { validateQuestionCsv } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value)) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
-
   const formData = await request.formData();
   const file = formData.get("file");
 

@@ -2,13 +2,10 @@ import { BarChart3, BookOpen, ClipboardList, FileUp } from "lucide-react";
 import Link from "next/link";
 
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  await requireAuth();
-
   const [setCount, questionCount, attemptCount, wrongCount, recentSets, recentAttempts] =
     await Promise.all([
       prisma.questionSet.count(),

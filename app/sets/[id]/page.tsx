@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { requireAuth } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,6 @@ type PageProps = {
 };
 
 export default async function SetDetailPage({ params }: PageProps) {
-  await requireAuth();
   const { id } = await params;
   const set = await prisma.questionSet.findUnique({
     where: { id },

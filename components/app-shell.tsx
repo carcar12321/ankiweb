@@ -4,13 +4,12 @@ import {
   BookOpen,
   FileUp,
   Home,
-  LogOut,
   Moon,
   PanelTop,
   Table2
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type ThemeMode = "default" | "dark" | "excel";
@@ -33,9 +32,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [theme, setTheme] = useState<ThemeMode>("default");
-  const isLogin = pathname === "/login";
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("ooo-theme") as ThemeMode;
@@ -51,16 +48,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setTheme(nextTheme);
     document.documentElement.dataset.theme = nextTheme;
     window.localStorage.setItem("ooo-theme", nextTheme);
-  }
-
-  async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
-
-  if (isLogin) {
-    return <>{children}</>;
   }
 
   return (
@@ -112,14 +99,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </div>
-          <button
-            className="icon-button"
-            onClick={logout}
-            title="로그아웃"
-            type="button"
-          >
-            <LogOut size={17} />
-          </button>
         </div>
       </header>
       {children}

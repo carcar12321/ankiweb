@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   getWrongNoteAction,
@@ -11,10 +10,6 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  if (!verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value)) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
-
   const body = (await request.json().catch(() => null)) as {
     questionId?: string;
     selected?: string;

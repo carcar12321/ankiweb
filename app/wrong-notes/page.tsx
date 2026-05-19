@@ -1,12 +1,9 @@
 import { WrongNotesPanel } from "@/components/wrong-notes-panel";
-import { requireAuth } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function WrongNotesPage() {
-  await requireAuth();
-
   const notes = await prisma.wrongNote.findMany({
     where: { status: "ACTIVE" },
     orderBy: [{ wrongCount: "desc" }, { lastWrongAt: "desc" }],

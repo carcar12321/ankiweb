@@ -1,11 +1,8 @@
 import { UploadForm } from "@/components/upload-form";
-import { requireAuth } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
 
 export default async function UploadPage() {
-  await requireAuth();
-
   return (
     <main className="page">
       <section className="page-header">

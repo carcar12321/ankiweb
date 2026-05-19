@@ -14,11 +14,7 @@ npm run dev
 
 ```bash
 DATABASE_URL="postgresql://..."
-APP_PASSWORD="로그인에 사용할 비밀번호"
-AUTH_SECRET="긴 랜덤 문자열"
 ```
-
-개발 중 `APP_PASSWORD`가 없으면 임시 기본값 `study1234`를 사용합니다. 운영 배포에서는 반드시 직접 설정하세요.
 
 ## CSV 양식
 
@@ -42,11 +38,10 @@ tag,category
 
 1. Railway 프로젝트를 만들고 PostgreSQL 서비스를 추가합니다.
 2. Next.js 서비스의 Variables에 Postgres의 `DATABASE_URL`을 reference variable로 연결합니다.
-3. Next.js 서비스 Variables에 `APP_PASSWORD`, `AUTH_SECRET`을 추가합니다.
-4. Deploy 설정의 Pre-deploy Command를 아래로 설정합니다.
+3. Deploy 설정의 Pre-deploy Command를 아래로 설정합니다.
 
 ```bash
 npx prisma migrate deploy
 ```
 
-5. 빌드 후 start command는 `package.json`의 `start` 스크립트가 사용됩니다.
+4. 빌드 후 start command는 `package.json`의 `start` 스크립트가 사용됩니다.

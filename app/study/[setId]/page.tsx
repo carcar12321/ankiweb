@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 
 import { StudySession } from "@/components/study-session";
-import { requireAuth } from "@/lib/auth-server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +10,6 @@ type PageProps = {
 };
 
 export default async function StudyPage({ params }: PageProps) {
-  await requireAuth();
   const { setId } = await params;
   const set = await prisma.questionSet.findUnique({
     where: { id: setId },

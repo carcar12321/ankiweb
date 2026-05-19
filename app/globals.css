@@ -554,22 +554,6 @@ tr:last-child td {
   border-color: color-mix(in srgb, var(--danger) 55%, var(--line));
 }
 
-.login-wrap {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: 24px;
-}
-
-.login-card {
-  width: min(440px, 100%);
-}
-
-.login-title {
-  margin-bottom: 18px;
-  text-align: center;
-}
-
 .empty {
   padding: 28px;
   border: 1px dashed var(--line);
