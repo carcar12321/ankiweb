@@ -201,10 +201,12 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
             <tbody>
               {queue.map((note) => (
                 <tr key={note.id}>
-                  <td>{note.question.setTitle}</td>
-                  <td>{note.question.prompt}</td>
-                  <td>{note.wrongCount}회</td>
-                  <td>{new Date(note.lastWrongAt).toLocaleDateString("ko-KR")}</td>
+                  <td data-label="세트">{note.question.setTitle}</td>
+                  <td data-label="문제">{note.question.prompt}</td>
+                  <td data-label="오답">{note.wrongCount}회</td>
+                  <td data-label="최근 오답">
+                    {new Date(note.lastWrongAt).toLocaleDateString("ko-KR")}
+                  </td>
                 </tr>
               ))}
             </tbody>

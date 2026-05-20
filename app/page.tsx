@@ -108,11 +108,14 @@ export default async function DashboardPage() {
                 <tbody>
                   {recentAttempts.map((attempt) => (
                     <tr key={attempt.id}>
-                      <td>{attempt.set.title}</td>
-                      <td className={attempt.isCorrect ? "success-text" : "danger-text"}>
+                      <td data-label="세트">{attempt.set.title}</td>
+                      <td
+                        className={attempt.isCorrect ? "success-text" : "danger-text"}
+                        data-label="결과"
+                      >
                         {attempt.isCorrect ? "정답" : "오답"}
                       </td>
-                      <td>{attempt.question.prompt}</td>
+                      <td data-label="문제">{attempt.question.prompt}</td>
                     </tr>
                   ))}
                 </tbody>

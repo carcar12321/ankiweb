@@ -53,8 +53,8 @@ export default async function SetDetailPage({ params }: PageProps) {
           <tbody>
             {set.questions.map((question, index) => (
               <tr key={question.id}>
-                <td>{index + 1}</td>
-                <td>
+                <td data-label="#">{index + 1}</td>
+                <td data-label="문제">
                   <strong>{question.prompt}</strong>
                   <div className="pill-row" style={{ marginTop: 8 }}>
                     {question.category ? (
@@ -63,8 +63,8 @@ export default async function SetDetailPage({ params }: PageProps) {
                     {question.tag ? <span className="pill">{question.tag}</span> : null}
                   </div>
                 </td>
-                <td>{question.correct}</td>
-                <td>{question.explanation}</td>
+                <td data-label="정답">{question.correct}</td>
+                <td data-label="해설">{question.explanation}</td>
               </tr>
             ))}
           </tbody>
