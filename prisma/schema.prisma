@@ -19,50 +19,98 @@ enum WrongNoteStatus {
   RESOLVED
 }
 
+enum StudySessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
 model QuestionSet {
-  id          String     @id @default(cuid())
-  title       String
-  description String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  questions   Question[]
-  attempts    Attempt[]
+  id            String         @id @default(cuid())
+  title         String
+  description   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  questions     Question[]
+  attempts      Attempt[]
+  studySessions StudySession[]
 }
 
 model Question {
-  id          String      @id @default(cuid())
-  setId       String
-  prompt      String
-  choiceA     String
-  choiceB     String
-  choiceC     String
-  choiceD     String
-  correct     Choice
-  explanation String
-  tag         String?
-  category    String?
-  order       Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  set         QuestionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
-  attempts    Attempt[]
-  wrongNote   WrongNote?
+  id                String             @id @default(cuid())
+  setId             String
+  prompt            String
+  choiceA           String
+  choiceB           String
+  choiceC           String
+  choiceD           String
+  correct           Choice
+  explanation       String
+  tag               String?
+  category          String?
+  order             Int
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  set               QuestionSet        @relation(fields: [setId], references: [id], onDelete: Cascade)
+  attempts          Attempt[]
+  wrongNote         WrongNote?
+  studySessionItems StudySessionItem[]
 
   @@index([setId, order])
 }
 
 model Attempt {
-  id         String      @id @default(cuid())
+  id         String        @id @default(cuid())
   questionId String
   setId      String
+  sessionId  String?
   selected   Choice
   isCorrect  Boolean
-  answeredAt DateTime    @default(now())
-  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  set        QuestionSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  answeredAt DateTime      @default(now())
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  set        QuestionSet   @relation(fields: [setId], references: [id], onDelete: Cascade)
+  session    StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([questionId])
+  @@index([sessionId])
   @@index([setId, answeredAt])
+}
+
+model StudySession {
+  id             String             @id @default(cuid())
+  setId          String
+  status         StudySessionStatus @default(ACTIVE)
+  currentIndex   Int                @default(0)
+  totalQuestions Int
+  correctCount   Int                @default(0)
+  startedAt      DateTime           @default(now())
+  completedAt    DateTime?
+  abandonedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  set            QuestionSet        @relation(fields: [setId], references: [id], onDelete: Cascade)
+  items          StudySessionItem[]
+  attempts       Attempt[]
+
+  @@index([setId, status, updatedAt])
+}
+
+model StudySessionItem {
+  id         String       @id @default(cuid())
+  sessionId  String
+  questionId String
+  position   Int
+  selected   Choice?
+  isCorrect  Boolean?
+  answeredAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  session    StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question   Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, position])
+  @@unique([sessionId, questionId])
+  @@index([questionId])
 }
 
 model WrongNote {

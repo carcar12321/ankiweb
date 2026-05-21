@@ -2,7 +2,7 @@
 
 import { CheckCircle2, ChevronRight, RotateCcw, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import type { Choice } from "@/lib/study-logic";
 
@@ -18,27 +18,35 @@ type AnswerResult = {
   isCorrect: boolean;
   correctChoice: Choice;
   explanation: string;
+  currentIndex: number;
+  totalQuestions: number;
+  complete: boolean;
+  correctCount: number;
 };
 
 export function StudySession({
-  setTitle,
-  questions
+  initialCorrectCount,
+  initialIndex,
+  questions,
+  sessionId,
+  setId,
+  setTitle
 }: {
-  setTitle: string;
+  initialCorrectCount: number;
+  initialIndex: number;
   questions: StudyQuestion[];
+  sessionId: string;
+  setId: string;
+  setTitle: string;
 }) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(initialIndex);
   const [selected, setSelected] = useState<Choice | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
-  const [answers, setAnswers] = useState<boolean[]>([]);
+  const [correctCount, setCorrectCount] = useState(initialCorrectCount);
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const current = questions[index];
   const complete = index >= questions.length;
-
-  const correctCount = useMemo(
-    () => answers.filter(Boolean).length,
-    [answers]
-  );
 
   async function submit() {
     if (!selected || !current) {
@@ -46,33 +54,45 @@ export function StudySession({
     }
 
     setPending(true);
-    const response = await fetch("/api/attempts", {
+    setError(null);
+
+    const response = await fetch(`/api/study-sessions/${sessionId}/answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         questionId: current.id,
-        selected,
-        reviewMode: false
+        selected
       })
     });
-    const body = (await response.json()) as AnswerResult;
+    const body = (await response.json().catch(() => null)) as
+      | AnswerResult
+      | { ok: false; message?: string }
+      | null;
+
     setPending(false);
 
+    if (!response.ok || !body || "ok" in body) {
+      setError(
+        body && "message" in body && body.message
+          ? body.message
+          : "채점 중 문제가 생겼습니다."
+      );
+      return;
+    }
+
     setResult(body);
-    setAnswers((previous) => [...previous, body.isCorrect]);
+    setCorrectCount(body.correctCount);
   }
 
   function next() {
-    setSelected(null);
-    setResult(null);
-    setIndex((value) => value + 1);
-  }
+    if (!result) {
+      return;
+    }
 
-  function restart() {
-    setIndex(0);
     setSelected(null);
     setResult(null);
-    setAnswers([]);
+    setError(null);
+    setIndex(result.complete ? questions.length : result.currentIndex);
   }
 
   if (questions.length === 0) {
@@ -88,10 +108,10 @@ export function StudySession({
           총 {questions.length}문제 중 {correctCount}문제를 맞혔습니다.
         </p>
         <div className="actions">
-          <button className="button" onClick={restart} type="button">
+          <Link className="button" href={`/study/${setId}`}>
             <RotateCcw size={17} />
-            다시 풀기
-          </button>
+            새 풀이 설정
+          </Link>
           <Link className="button-ghost" href="/wrong-notes">
             오답노트 보기
           </Link>
@@ -134,7 +154,7 @@ export function StudySession({
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                disabled={Boolean(result)}
+                disabled={Boolean(result) || pending}
                 key={choice}
                 onClick={() => setSelected(choice)}
                 type="button"
@@ -146,6 +166,7 @@ export function StudySession({
           })}
         </div>
       </div>
+      {error ? <div className="status-box error">{error}</div> : null}
       {result ? (
         <div className={`feedback ${result.isCorrect ? "correct" : "incorrect"}`}>
           <h2 className={result.isCorrect ? "success-text" : "danger-text"}>
@@ -164,7 +185,7 @@ export function StudySession({
           </p>
           <p>{result.explanation}</p>
           <button className="button" onClick={next} type="button">
-            다음 문제
+            {result.complete ? "결과 보기" : "다음 문제"}
             <ChevronRight size={17} />
           </button>
         </div>
