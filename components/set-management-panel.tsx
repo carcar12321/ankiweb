@@ -83,12 +83,13 @@ export function SetManagementPanel({
             <span>문제집명</span>
             <input
               className="input"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  title: event.currentTarget.value
-                }))
-              }
+                  title: value
+                }));
+              }}
               value={form.title}
             />
           </label>
@@ -96,12 +97,13 @@ export function SetManagementPanel({
             <span>다운로드 파일명</span>
             <input
               className="input"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  exportFileName: event.currentTarget.value
-                }))
-              }
+                  exportFileName: value
+                }));
+              }}
               placeholder="예: network-part1.csv"
               value={form.exportFileName}
             />
@@ -111,12 +113,13 @@ export function SetManagementPanel({
           <span>설명</span>
           <textarea
             className="textarea"
-            onChange={(event) =>
+            onChange={(event) => {
+              const value = event.currentTarget.value;
               setForm((current) => ({
                 ...current,
-                description: event.currentTarget.value
-              }))
-            }
+                description: value
+              }));
+            }}
             value={form.description}
           />
         </label>

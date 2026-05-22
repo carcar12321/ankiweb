@@ -74,12 +74,13 @@ export function AiSettingsForm({
             <span>호출 모델</span>
             <select
               className="input"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  model: event.currentTarget.value
-                }))
-              }
+                  model: value
+                }));
+              }}
               value={form.model}
             >
               {modelOptions.map((option) => (
@@ -93,12 +94,13 @@ export function AiSettingsForm({
             <span>Reasoning effort</span>
             <select
               className="input"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  reasoningEffort: event.currentTarget.value
-                }))
-              }
+                  reasoningEffort: value
+                }));
+              }}
               value={form.reasoningEffort}
             >
               {reasoningEfforts.map((effort) => (
@@ -113,9 +115,10 @@ export function AiSettingsForm({
           <span>답변 톤</span>
           <input
             className="input"
-            onChange={(event) =>
-              setForm((current) => ({ ...current, tone: event.currentTarget.value }))
-            }
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              setForm((current) => ({ ...current, tone: value }));
+            }}
             value={form.tone}
           />
         </label>
@@ -123,12 +126,13 @@ export function AiSettingsForm({
           <span>추가 지시사항</span>
           <textarea
             className="textarea"
-            onChange={(event) =>
+            onChange={(event) => {
+              const value = event.currentTarget.value;
               setForm((current) => ({
                 ...current,
-                customInstructions: event.currentTarget.value
-              }))
-            }
+                customInstructions: value
+              }));
+            }}
             placeholder="예: 중복 설명은 줄이고, 시험 대비 암기 포인트와 실전 판단 기준을 먼저 정리해줘."
             value={form.customInstructions}
           />
