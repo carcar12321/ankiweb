@@ -1,3 +1,4 @@
+import { AiWeaknessPanel } from "@/components/ai-weakness-panel";
 import { WrongNotesPanel } from "@/components/wrong-notes-panel";
 import { prisma } from "@/lib/prisma";
 
@@ -27,6 +28,7 @@ export default async function WrongNotesPage() {
           </p>
         </div>
       </section>
+      <AiWeaknessPanel />
       <WrongNotesPanel
         notes={notes.map((note) => ({
           id: note.id,

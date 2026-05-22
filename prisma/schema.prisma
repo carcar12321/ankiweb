@@ -42,20 +42,28 @@ enum StudySessionMode {
   RANDOM
 }
 
+enum GeneratedQuestionDraftStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model QuestionSet {
-  id                  String                  @id @default(cuid())
+  id                  String                   @id @default(cuid())
   title               String
   description         String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
+  exportFileName      String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
   questions           Question[]
   attempts            Attempt[]
   studySessions       StudySession[]
   studySessionSources StudySessionSourceSet[]
+  generatedDrafts     GeneratedQuestionDraft[]
 }
 
 model Question {
-  id                String              @id @default(cuid())
+  id                String                   @id @default(cuid())
   setId             String
   prompt            String
   choiceA           String
@@ -67,14 +75,15 @@ model Question {
   tag               String?
   category          String?
   order             Int
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  set               QuestionSet         @relation(fields: [setId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  set               QuestionSet              @relation(fields: [setId], references: [id], onDelete: Cascade)
   attempts          Attempt[]
   wrongNote         WrongNote?
   studyState        QuestionStudyState?
   reviewLogs        StudyReviewLog[]
   studySessionItems StudySessionItem[]
+  generatedDrafts   GeneratedQuestionDraft[]
 
   @@index([setId, order])
 }
@@ -136,7 +145,6 @@ model StudySessionItem {
   question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, position])
-  @@unique([sessionId, questionId])
   @@index([questionId])
 }
 
@@ -214,4 +222,30 @@ model WrongNote {
 
   @@index([status, lastWrongAt])
   @@index([dueAt])
+}
+
+model GeneratedQuestionDraft {
+  id                 String                       @id @default(cuid())
+  setId              String
+  sourceQuestionId   String
+  status             GeneratedQuestionDraftStatus @default(PENDING)
+  prompt             String
+  choiceA            String
+  choiceB            String
+  choiceC            String
+  choiceD            String
+  correct            Choice
+  explanation        String
+  tag                String?
+  category           String?
+  rationale          String?
+  approvedQuestionId String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  approvedAt         DateTime?
+  set                QuestionSet                  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  sourceQuestion     Question                     @relation(fields: [sourceQuestionId], references: [id], onDelete: Cascade)
+
+  @@index([setId, status, createdAt])
+  @@index([sourceQuestionId])
 }

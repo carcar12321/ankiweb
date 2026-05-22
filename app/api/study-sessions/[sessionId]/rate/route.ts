@@ -6,6 +6,7 @@ import {
   scheduleSm2Review,
   type ReviewRating
 } from "@/lib/scheduler";
+import { shouldAppendAgainReplay } from "@/lib/study-insights";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         items: {
           include: {
             question: {
-              include: { studyState: true }
+              include: {
+                set: true,
+                studyState: true
+              }
             }
           },
           orderBy: { position: "asc" }
@@ -100,7 +104,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       state: currentItem.question.studyState
     });
     const nextIndex = session.currentIndex + 1;
-    const complete = nextIndex >= session.totalQuestions;
+    const appendAgainReplay = shouldAppendAgainReplay(
+      session.items,
+      currentItem.question.id,
+      rating as ReviewRating
+    );
+    const nextTotalQuestions = session.totalQuestions + (appendAgainReplay ? 1 : 0);
+    const complete = nextIndex >= nextTotalQuestions;
     const correctCount = session.correctCount + (currentItem.isCorrect ? 1 : 0);
 
     await transaction.questionStudyState.upsert({
@@ -153,11 +163,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     });
 
+    if (appendAgainReplay) {
+      await transaction.studySessionItem.create({
+        data: {
+          sessionId: session.id,
+          questionId: currentItem.question.id,
+          position: session.totalQuestions
+        }
+      });
+    }
+
     await transaction.studySession.update({
       where: { id: session.id },
       data: {
         currentIndex: nextIndex,
         correctCount,
+        totalQuestions: nextTotalQuestions,
         status: complete ? "COMPLETED" : "ACTIVE",
         completedAt: complete ? now : undefined
       }
@@ -202,12 +223,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
       body: {
         ok: true,
         currentIndex: nextIndex,
-        totalQuestions: session.totalQuestions,
+        totalQuestions: nextTotalQuestions,
         complete,
         correctCount,
         nextDueAt: scheduled.nextDueAt.toISOString(),
         intervalDays: scheduled.nextIntervalDays,
-        easeFactor: scheduled.nextEaseFactor
+        easeFactor: scheduled.nextEaseFactor,
+        appendedQuestion: appendAgainReplay
+          ? {
+              id: currentItem.question.id,
+              prompt: currentItem.question.prompt,
+              choices: {
+                A: currentItem.question.choiceA,
+                B: currentItem.question.choiceB,
+                C: currentItem.question.choiceC,
+                D: currentItem.question.choiceD
+              },
+              setTitle: session.mode === "RANDOM" ? currentItem.question.set.title : null,
+              tag: currentItem.question.tag,
+              category: currentItem.question.category
+            }
+          : null
       },
       status: 200
     };

@@ -91,7 +91,10 @@ export default async function RandomStudyPage({ searchParams }: PageProps) {
         orderBy: { position: "asc" },
         include: {
           question: {
-            include: { set: true }
+            include: {
+              set: true,
+              studyState: true
+            }
           }
         }
       }
@@ -120,6 +123,8 @@ export default async function RandomStudyPage({ searchParams }: PageProps) {
     selected: item.selected,
     isCorrect: item.isCorrect,
     answeredAt: item.answeredAt?.toISOString() ?? null,
+    rating: item.rating,
+    nextDueAt: item.question.studyState?.dueAt.toISOString() ?? null,
     setTitle: item.question.set.title,
     tag: item.question.tag,
     category: item.question.category

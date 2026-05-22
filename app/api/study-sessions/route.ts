@@ -52,9 +52,12 @@ export async function POST(request: NextRequest) {
     setIds?: string[];
     categories?: Array<string | null>;
     questionCount?: number;
+    selection?: string;
   } | null;
   const mode = body?.mode === "RANDOM" ? "RANDOM" : "SET";
   const categories = normalizeCategoryFilters(body?.categories);
+  const selection =
+    body?.selection === "DUE" || body?.selection === "NEW" ? body.selection : "ALL";
 
   if (!body) {
     return NextResponse.json(
@@ -193,13 +196,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const questions = await prisma.question.findMany({
+  const allQuestions = await prisma.question.findMany({
     where: {
       setId: { in: setIds },
       ...categoryWhere(categories)
     },
     orderBy: [{ setId: "asc" }, { order: "asc" }],
     include: { studyState: true }
+  });
+  const now = new Date();
+  const questions = allQuestions.filter((question) => {
+    if (selection === "DUE") {
+      return question.studyState && question.studyState.dueAt <= now;
+    }
+
+    if (selection === "NEW") {
+      return !question.studyState;
+    }
+
+    return true;
   });
   const totalQuestions = questions.length;
 
@@ -229,7 +244,6 @@ export async function POST(request: NextRequest) {
     })),
     questionCount
   );
-  const now = new Date();
   const session = await prisma.$transaction(async (transaction) => {
     await transaction.studySession.updateMany({
       where: {

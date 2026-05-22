@@ -470,9 +470,55 @@ tr:last-child td {
   color: var(--danger);
 }
 
+.inline-link {
+  color: var(--primary);
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .session-card {
   display: grid;
   gap: 12px;
+}
+
+.review-card {
+  display: grid;
+  gap: 14px;
+}
+
+.review-counts,
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-counts div,
+.report-grid .status-box {
+  display: grid;
+  gap: 4px;
+}
+
+.review-counts strong,
+.report-grid strong {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.review-counts span,
+.report-grid span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.study-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.study-row:last-child {
+  border-bottom: 0;
 }
 
 .quick-options {
@@ -608,6 +654,54 @@ tr:last-child td {
   padding: 16px;
 }
 
+.ai-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.ai-login-box {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.ai-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.ai-messages {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-message {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.ai-message p {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+.ai-message.assistant {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
 .feedback.correct {
   border-color: color-mix(in srgb, var(--success) 55%, var(--line));
 }
@@ -712,7 +806,7 @@ tr:last-child td {
     grid-column: 1 / -1;
     grid-row: 2;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
     overflow: visible;
   }
@@ -791,8 +885,19 @@ tr:last-child td {
     min-height: 44px;
   }
 
+  .ai-session-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-chat-form {
+    grid-template-columns: 1fr;
+  }
+
   .quick-options,
   .check-grid,
+  .report-grid,
+  .review-counts,
   .rating-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

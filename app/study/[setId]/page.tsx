@@ -97,7 +97,11 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
     include: {
       items: {
         orderBy: { position: "asc" },
-        include: { question: true }
+        include: {
+          question: {
+            include: { studyState: true }
+          }
+        }
       }
     }
   });
@@ -124,6 +128,8 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
     selected: item.selected,
     isCorrect: item.isCorrect,
     answeredAt: item.answeredAt?.toISOString() ?? null,
+    rating: item.rating,
+    nextDueAt: item.question.studyState?.dueAt.toISOString() ?? null,
     tag: item.question.tag,
     category: item.question.category
   }));

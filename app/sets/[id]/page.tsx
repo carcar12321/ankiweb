@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { SetManagementPanel } from "@/components/set-management-panel";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,13 @@ export default async function SetDetailPage({ params }: PageProps) {
       </section>
 
       {set.description ? <p className="panel">{set.description}</p> : null}
+
+      <SetManagementPanel
+        description={set.description}
+        exportFileName={set.exportFileName}
+        setId={set.id}
+        title={set.title}
+      />
 
       <section className="table-wrap">
         <table>
