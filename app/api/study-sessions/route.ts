@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 
 import { normalizeCategoryFilters } from "@/lib/categories";
-import { shuffleChoiceOrder } from "@/lib/choice-order";
 import { prisma } from "@/lib/prisma";
 import { selectStudyQuestionIds } from "@/lib/study-session-logic";
+
+const FIXED_CHOICE_ORDER = "ABCD" as const;
 
 export const runtime = "nodejs";
 
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
           totalQuestions: selectedQuestionIds.length,
           items: {
             create: selectedQuestionIds.map((questionId, position) => ({
-              choiceOrder: shuffleChoiceOrder(),
+              choiceOrder: FIXED_CHOICE_ORDER,
               questionId,
               position
             }))
@@ -269,7 +270,7 @@ export async function POST(request: NextRequest) {
         },
         items: {
           create: selectedQuestionIds.map((questionId, position) => ({
-            choiceOrder: shuffleChoiceOrder(),
+            choiceOrder: FIXED_CHOICE_ORDER,
             questionId,
             position
           }))

@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 
 import {
-  shuffleChoiceOrder,
   toDisplayedChoices,
   toDisplayChoice,
   toOriginalChoice
 } from "@/lib/choice-order";
 import type { Choice } from "@/lib/study-logic";
+
+const FIXED_CHOICE_ORDER = "ABCD" as const;
 
 type WrongNoteItem = {
   id: string;
@@ -36,7 +37,7 @@ type AnswerResult = {
 export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
   const [queue, setQueue] = useState(() =>
     notes.map((note) => {
-      const choiceOrder = shuffleChoiceOrder();
+      const choiceOrder = FIXED_CHOICE_ORDER;
       return {
         ...note,
         question: {
@@ -107,7 +108,7 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
   function restart() {
     setQueue(
       notes.map((note) => {
-        const choiceOrder = shuffleChoiceOrder();
+        const choiceOrder = FIXED_CHOICE_ORDER;
         return {
           ...note,
           question: {

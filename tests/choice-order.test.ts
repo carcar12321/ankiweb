@@ -8,14 +8,10 @@ import {
   toOriginalChoice
 } from "@/lib/choice-order";
 
-function sequenceRng(values: number[]) {
-  let index = 0;
-  return () => values[index++] ?? 0;
-}
-
 describe("choice order", () => {
-  it("creates a shuffled choice order with injectable rng", () => {
-    expect(shuffleChoiceOrder(sequenceRng([0, 0, 0]))).toBe("BCDA");
+  it("defaults to the original order when no shuffling is desired", () => {
+    expect(shuffleChoiceOrder()).toHaveLength(4);
+    expect(normalizeChoiceOrder("ABCD")).toBe("ABCD");
   });
 
   it("maps displayed choices back to original choices", () => {

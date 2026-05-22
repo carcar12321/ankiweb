@@ -6,10 +6,12 @@ import {
   scheduleSm2Review,
   type ReviewRating
 } from "@/lib/scheduler";
-import { shuffleChoiceOrder, toDisplayedChoices } from "@/lib/choice-order";
+import { toDisplayedChoices } from "@/lib/choice-order";
 import { shouldAppendAgainReplay } from "@/lib/study-insights";
 
 export const runtime = "nodejs";
+
+const FIXED_CHOICE_ORDER = "ABCD" as const;
 
 type RouteContext = {
   params: Promise<{ sessionId: string }> | { sessionId: string };
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       currentItem.question.id,
       rating as ReviewRating
     );
-    const replayChoiceOrder = appendAgainReplay ? shuffleChoiceOrder() : null;
+    const replayChoiceOrder = appendAgainReplay ? FIXED_CHOICE_ORDER : null;
     const nextTotalQuestions = session.totalQuestions + (appendAgainReplay ? 1 : 0);
     const complete = nextIndex >= nextTotalQuestions;
     const correctCount = session.correctCount + (currentItem.isCorrect ? 1 : 0);
