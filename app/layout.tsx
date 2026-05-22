@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OOO Interview Quiz",
-  description: "CSV로 문제를 올리고 오답노트를 쌓는 1인용 객관식 학습앱"
+  description: "CSV 문제집과 Anki식 반복 학습을 위한 개인 학습 앱"
 };
 
 export default function RootLayout({

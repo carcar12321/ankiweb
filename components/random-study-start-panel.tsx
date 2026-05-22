@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Play, RotateCcw } from "lucide-react";
+import { Loader2, Play, Shuffle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -20,29 +20,49 @@ type ActiveSessionSummary = {
   updatedAt: string;
 };
 
-type PartOption = {
-  category: CategoryValue;
-  count: number;
+type RandomStudySet = {
+  id: string;
+  title: string;
+  totalQuestions: number;
+  parts: Array<{
+    category: CategoryValue;
+    count: number;
+  }>;
 };
 
 function getDefaultCount(totalQuestions: number) {
   return Math.min(20, Math.max(totalQuestions, 1));
 }
 
-export function StudyStartPanel({
+export function RandomStudyStartPanel({
   activeSession,
-  partOptions,
-  setId,
-  setTitle,
-  totalQuestions
+  sets
 }: {
   activeSession?: ActiveSessionSummary | null;
-  partOptions: PartOption[];
-  setId: string;
-  setTitle: string;
-  totalQuestions: number;
+  sets: RandomStudySet[];
 }) {
   const router = useRouter();
+  const allSetIds = useMemo(() => sets.map((set) => set.id), [sets]);
+  const [selectedSetIds, setSelectedSetIds] = useState(allSetIds);
+  const partOptions = useMemo(() => {
+    const counts = new Map<string, { category: CategoryValue; count: number }>();
+
+    sets
+      .filter((set) => selectedSetIds.includes(set.id))
+      .flatMap((set) => set.parts)
+      .forEach((part) => {
+        const key = getCategoryKey(part.category);
+        const current = counts.get(key);
+        counts.set(key, {
+          category: part.category,
+          count: (current?.count ?? 0) + part.count
+        });
+      });
+
+    return Array.from(counts.values()).sort((left, right) =>
+      getCategoryLabel(left.category).localeCompare(getCategoryLabel(right.category))
+    );
+  }, [selectedSetIds, sets]);
   const allPartKeys = useMemo(
     () => partOptions.map((part) => getCategoryKey(part.category)),
     [partOptions]
@@ -59,6 +79,10 @@ export function StudyStartPanel({
   const [questionCount, setQuestionCount] = useState(defaultCount);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedSetIds(allSetIds);
+  }, [allSetIds]);
 
   useEffect(() => {
     setSelectedPartKeys(allPartKeys);
@@ -78,14 +102,12 @@ export function StudyStartPanel({
     [selectedTotal]
   );
 
-  function changeQuestionCount(nextValue: number) {
-    if (!Number.isFinite(nextValue)) {
-      setQuestionCount(defaultCount);
-      return;
-    }
-
-    const rounded = Math.trunc(nextValue);
-    setQuestionCount(Math.min(selectedTotal, Math.max(1, rounded)));
+  function toggleSet(setId: string) {
+    setSelectedSetIds((current) =>
+      current.includes(setId)
+        ? current.filter((item) => item !== setId)
+        : [...current, setId]
+    );
   }
 
   function togglePart(key: string) {
@@ -94,6 +116,16 @@ export function StudyStartPanel({
         ? current.filter((item) => item !== key)
         : [...current, key]
     );
+  }
+
+  function changeQuestionCount(nextValue: number) {
+    if (!Number.isFinite(nextValue)) {
+      setQuestionCount(defaultCount);
+      return;
+    }
+
+    const rounded = Math.trunc(nextValue);
+    setQuestionCount(Math.min(selectedTotal, Math.max(1, rounded)));
   }
 
   async function startSession(event: FormEvent<HTMLFormElement>) {
@@ -105,8 +137,8 @@ export function StudyStartPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mode: "SET",
-        setId,
+        mode: "RANDOM",
+        setIds: selectedSetIds,
         categories: selectedPartKeys.map(categoryFromKey),
         questionCount
       })
@@ -120,29 +152,33 @@ export function StudyStartPanel({
 
     if (!response.ok || !body || !body.ok) {
       const message = body && !body.ok ? body.message : undefined;
-      setError(message ?? "학습을 시작하지 못했습니다.");
+      setError(message ?? "랜덤학습을 시작하지 못했습니다.");
       return;
     }
 
-    router.push(`/study/${setId}?sessionId=${body.sessionId}`);
+    router.push(`/random-study?sessionId=${body.sessionId}`);
   }
 
   const activeProgress = activeSession
     ? Math.min(activeSession.currentIndex, activeSession.totalQuestions)
     : 0;
 
+  if (sets.length === 0) {
+    return <div className="empty">업로드된 문제집이 없습니다.</div>;
+  }
+
   return (
     <section className="panel quiz-shell">
       <div>
-        <p className="eyebrow">STUDY SETUP</p>
-        <h1>{setTitle}</h1>
-        <p className="muted">총 {totalQuestions}문제</p>
+        <p className="eyebrow">RANDOM STUDY</p>
+        <h1>랜덤학습</h1>
+        <p className="muted">선택 범위 {selectedTotal}문제</p>
       </div>
 
       {activeSession ? (
         <div className="status-box session-card">
           <div>
-            <h2>진행 중인 학습</h2>
+            <h2>진행 중인 랜덤학습</h2>
             <p className="muted">
               {activeProgress} / {activeSession.totalQuestions}문제 완료 · 정답{" "}
               {activeSession.correctCount}개
@@ -156,7 +192,7 @@ export function StudyStartPanel({
             />
           </div>
           <div className="actions">
-            <Link className="button" href={`/study/${setId}?sessionId=${activeSession.id}`}>
+            <Link className="button" href={`/random-study?sessionId=${activeSession.id}`}>
               <Play size={17} />
               이어하기
             </Link>
@@ -165,9 +201,23 @@ export function StudyStartPanel({
       ) : null}
 
       <form className="form-grid" onSubmit={startSession}>
-        <div>
-          <h2>{activeSession ? "새로 시작" : "학습 시작"}</h2>
-          <p className="muted">선택 범위 {selectedTotal}문제</p>
+        <div className="field">
+          <span>문제집</span>
+          <div className="check-grid">
+            {sets.map((set) => (
+              <label className="check-card" key={set.id}>
+                <input
+                  checked={selectedSetIds.includes(set.id)}
+                  onChange={() => toggleSet(set.id)}
+                  type="checkbox"
+                />
+                <span>
+                  {set.title}
+                  <small>{set.totalQuestions}문제</small>
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="field">
@@ -223,11 +273,11 @@ export function StudyStartPanel({
 
         <button
           className="button"
-          disabled={pending || selectedTotal === 0}
+          disabled={pending || selectedSetIds.length === 0 || selectedTotal === 0}
           type="submit"
         >
-          {pending ? <Loader2 size={17} /> : <RotateCcw size={17} />}
-          {pending ? "시작 중" : activeSession ? "새 학습 시작" : "학습 시작"}
+          {pending ? <Loader2 size={17} /> : <Shuffle size={17} />}
+          {pending ? "시작 중" : "랜덤학습 시작"}
         </button>
       </form>
     </section>

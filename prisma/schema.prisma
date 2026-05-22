@@ -25,19 +25,37 @@ enum StudySessionStatus {
   ABANDONED
 }
 
+enum ReviewRating {
+  AGAIN
+  HARD
+  GOOD
+  EASY
+}
+
+enum SchedulerAlgorithm {
+  SM2
+  FSRS
+}
+
+enum StudySessionMode {
+  SET
+  RANDOM
+}
+
 model QuestionSet {
-  id            String         @id @default(cuid())
-  title         String
-  description   String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  questions     Question[]
-  attempts      Attempt[]
-  studySessions StudySession[]
+  id                  String                  @id @default(cuid())
+  title               String
+  description         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  questions           Question[]
+  attempts            Attempt[]
+  studySessions       StudySession[]
+  studySessionSources StudySessionSourceSet[]
 }
 
 model Question {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   setId             String
   prompt            String
   choiceA           String
@@ -49,11 +67,13 @@ model Question {
   tag               String?
   category          String?
   order             Int
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  set               QuestionSet        @relation(fields: [setId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  set               QuestionSet         @relation(fields: [setId], references: [id], onDelete: Cascade)
   attempts          Attempt[]
   wrongNote         WrongNote?
+  studyState        QuestionStudyState?
+  reviewLogs        StudyReviewLog[]
   studySessionItems StudySessionItem[]
 
   @@index([setId, order])
@@ -77,40 +97,105 @@ model Attempt {
 }
 
 model StudySession {
-  id             String             @id @default(cuid())
-  setId          String
-  status         StudySessionStatus @default(ACTIVE)
-  currentIndex   Int                @default(0)
+  id             String                  @id @default(cuid())
+  setId          String?
+  mode           StudySessionMode        @default(SET)
+  algorithm      SchedulerAlgorithm      @default(SM2)
+  status         StudySessionStatus      @default(ACTIVE)
+  currentIndex   Int                     @default(0)
   totalQuestions Int
-  correctCount   Int                @default(0)
-  startedAt      DateTime           @default(now())
+  correctCount   Int                     @default(0)
+  startedAt      DateTime                @default(now())
   completedAt    DateTime?
   abandonedAt    DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  set            QuestionSet        @relation(fields: [setId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  set            QuestionSet?            @relation(fields: [setId], references: [id], onDelete: Cascade)
   items          StudySessionItem[]
   attempts       Attempt[]
+  sourceSets     StudySessionSourceSet[]
+  reviewLogs     StudyReviewLog[]
 
   @@index([setId, status, updatedAt])
+  @@index([mode, status, updatedAt])
 }
 
 model StudySessionItem {
-  id         String       @id @default(cuid())
+  id         String        @id @default(cuid())
   sessionId  String
   questionId String
   position   Int
   selected   Choice?
   isCorrect  Boolean?
   answeredAt DateTime?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  session    StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  question   Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  rating     ReviewRating?
+  ratedAt    DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  session    StudySession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, position])
   @@unique([sessionId, questionId])
   @@index([questionId])
+}
+
+model StudySessionSourceSet {
+  id        String       @id @default(cuid())
+  sessionId String
+  setId     String
+  createdAt DateTime     @default(now())
+  session   StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  set       QuestionSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, setId])
+  @@index([setId])
+}
+
+model QuestionStudyState {
+  id                 String             @id @default(cuid())
+  questionId         String             @unique
+  algorithm          SchedulerAlgorithm @default(SM2)
+  dueAt              DateTime           @default(now())
+  intervalDays       Int                @default(0)
+  easeFactor         Float              @default(2.5)
+  repetitions        Int                @default(0)
+  fsrsRetrievability Float?
+  fsrsStability      Float?
+  fsrsDifficulty     Float?
+  lastReviewedAt     DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  question           Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([dueAt])
+  @@index([algorithm, dueAt])
+}
+
+model StudyReviewLog {
+  id                   String             @id @default(cuid())
+  questionId           String
+  sessionId            String?
+  algorithm            SchedulerAlgorithm @default(SM2)
+  rating               ReviewRating
+  quality              Int
+  selected             Choice
+  wasCorrect           Boolean
+  previousDueAt        DateTime?
+  nextDueAt            DateTime
+  previousIntervalDays Int
+  nextIntervalDays     Int
+  previousEaseFactor   Float
+  nextEaseFactor       Float
+  previousRepetitions  Int
+  nextRepetitions      Int
+  reviewedAt           DateTime           @default(now())
+  question             Question           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  session              StudySession?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([questionId, reviewedAt])
+  @@index([sessionId])
+  @@index([algorithm, reviewedAt])
 }
 
 model WrongNote {

@@ -6,6 +6,7 @@ import {
   Home,
   Moon,
   PanelTop,
+  Shuffle,
   Table2
 } from "lucide-react";
 import Link from "next/link";
@@ -26,6 +27,7 @@ const themeModes: Array<{
 
 const navItems = [
   { href: "/", label: "대시보드", icon: Home },
+  { href: "/random-study", label: "랜덤학습", icon: Shuffle },
   { href: "/upload", label: "업로드", icon: FileUp },
   { href: "/wrong-notes", label: "오답노트", icon: BookOpen }
 ];

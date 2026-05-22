@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { scheduleSm2Review } from "@/lib/scheduler";
 import {
   getWrongNoteAction,
   normalizeChoice,
@@ -25,7 +26,8 @@ export async function POST(request: NextRequest) {
   }
 
   const question = await prisma.question.findUnique({
-    where: { id: body.questionId }
+    where: { id: body.questionId },
+    include: { studyState: true }
   });
 
   if (!question) {
@@ -41,6 +43,12 @@ export async function POST(request: NextRequest) {
     reviewMode: Boolean(body.reviewMode)
   });
   const now = new Date();
+  const rating = outcome.isCorrect ? "GOOD" : "AGAIN";
+  const scheduled = scheduleSm2Review({
+    rating,
+    reviewedAt: now,
+    state: question.studyState
+  });
 
   await prisma.$transaction(async (transaction) => {
     await transaction.attempt.create({
@@ -52,6 +60,47 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    await transaction.questionStudyState.upsert({
+      where: { questionId: question.id },
+      create: {
+        questionId: question.id,
+        algorithm: scheduled.algorithm,
+        dueAt: scheduled.nextDueAt,
+        intervalDays: scheduled.nextIntervalDays,
+        easeFactor: scheduled.nextEaseFactor,
+        repetitions: scheduled.nextRepetitions,
+        lastReviewedAt: now
+      },
+      update: {
+        algorithm: scheduled.algorithm,
+        dueAt: scheduled.nextDueAt,
+        intervalDays: scheduled.nextIntervalDays,
+        easeFactor: scheduled.nextEaseFactor,
+        repetitions: scheduled.nextRepetitions,
+        lastReviewedAt: now
+      }
+    });
+
+    await transaction.studyReviewLog.create({
+      data: {
+        questionId: question.id,
+        algorithm: scheduled.algorithm,
+        rating,
+        quality: scheduled.quality,
+        selected,
+        wasCorrect: outcome.isCorrect,
+        previousDueAt: scheduled.previousDueAt,
+        nextDueAt: scheduled.nextDueAt,
+        previousIntervalDays: scheduled.previousIntervalDays,
+        nextIntervalDays: scheduled.nextIntervalDays,
+        previousEaseFactor: scheduled.previousEaseFactor,
+        nextEaseFactor: scheduled.nextEaseFactor,
+        previousRepetitions: scheduled.previousRepetitions,
+        nextRepetitions: scheduled.nextRepetitions,
+        reviewedAt: now
+      }
+    });
+
     if (action === "increment") {
       await transaction.wrongNote.upsert({
         where: { questionId: question.id },
@@ -60,15 +109,17 @@ export async function POST(request: NextRequest) {
           wrongCount: 1,
           lastWrongAt: now,
           status: "ACTIVE",
-          dueAt: now,
-          intervalDays: 0,
-          easeFactor: 2.5
+          dueAt: scheduled.nextDueAt,
+          intervalDays: scheduled.nextIntervalDays,
+          easeFactor: scheduled.nextEaseFactor
         },
         update: {
           wrongCount: { increment: 1 },
           lastWrongAt: now,
           status: "ACTIVE",
-          dueAt: now
+          dueAt: scheduled.nextDueAt,
+          intervalDays: scheduled.nextIntervalDays,
+          easeFactor: scheduled.nextEaseFactor
         }
       });
     }

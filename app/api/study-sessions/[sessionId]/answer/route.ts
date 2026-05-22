@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
-import {
-  getWrongNoteAction,
-  normalizeChoice,
-  scoreAnswer
-} from "@/lib/study-logic";
+import { normalizeChoice, scoreAnswer } from "@/lib/study-logic";
 
 export const runtime = "nodejs";
 
@@ -41,14 +37,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!session) {
       return {
-        body: { ok: false, message: "풀이 세션을 찾을 수 없습니다." },
+        body: { ok: false, message: "학습 세션을 찾을 수 없습니다." },
         status: 404
       };
     }
 
     if (session.status !== "ACTIVE") {
       return {
-        body: { ok: false, message: "이미 종료된 풀이 세션입니다." },
+        body: { ok: false, message: "이미 종료된 학습 세션입니다." },
         status: 409
       };
     }
@@ -73,27 +69,42 @@ export async function POST(request: NextRequest, context: RouteContext) {
       };
     }
 
-    if (currentItem.questionId !== body.questionId || currentItem.answeredAt) {
+    if (currentItem.questionId !== body.questionId) {
       return {
         body: { ok: false, message: "현재 순서의 문제만 채점할 수 있습니다." },
         status: 409
       };
     }
 
+    if (currentItem.ratedAt) {
+      return {
+        body: { ok: false, message: "이미 평가가 끝난 문제입니다." },
+        status: 409
+      };
+    }
+
+    if (currentItem.answeredAt && currentItem.selected && currentItem.isCorrect !== null) {
+      return {
+        body: {
+          ok: true,
+          isCorrect: currentItem.isCorrect,
+          correctChoice: currentItem.question.correct,
+          selectedChoice: currentItem.selected,
+          explanation: currentItem.question.explanation,
+          currentIndex: session.currentIndex,
+          totalQuestions: session.totalQuestions
+        },
+        status: 200
+      };
+    }
+
     const outcome = scoreAnswer(currentItem.question.correct, selected);
-    const action = getWrongNoteAction({
-      isCorrect: outcome.isCorrect,
-      reviewMode: false
-    });
     const now = new Date();
-    const nextIndex = session.currentIndex + 1;
-    const complete = nextIndex >= session.totalQuestions;
-    const correctCount = session.correctCount + (outcome.isCorrect ? 1 : 0);
 
     await transaction.attempt.create({
       data: {
         questionId: currentItem.question.id,
-        setId: session.setId,
+        setId: currentItem.question.setId,
         sessionId: session.id,
         selected,
         isCorrect: outcome.isCorrect
@@ -109,46 +120,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     });
 
-    await transaction.studySession.update({
-      where: { id: session.id },
-      data: {
-        currentIndex: nextIndex,
-        correctCount,
-        status: complete ? "COMPLETED" : "ACTIVE",
-        completedAt: complete ? now : undefined
-      }
-    });
-
-    if (action === "increment") {
-      await transaction.wrongNote.upsert({
-        where: { questionId: currentItem.question.id },
-        create: {
-          questionId: currentItem.question.id,
-          wrongCount: 1,
-          lastWrongAt: now,
-          status: "ACTIVE",
-          dueAt: now,
-          intervalDays: 0,
-          easeFactor: 2.5
-        },
-        update: {
-          wrongCount: { increment: 1 },
-          lastWrongAt: now,
-          status: "ACTIVE",
-          dueAt: now
-        }
-      });
-    }
-
     return {
       body: {
+        ok: true,
         isCorrect: outcome.isCorrect,
         correctChoice: outcome.correctChoice,
+        selectedChoice: selected,
         explanation: currentItem.question.explanation,
-        currentIndex: nextIndex,
-        totalQuestions: session.totalQuestions,
-        complete,
-        correctCount
+        currentIndex: session.currentIndex,
+        totalQuestions: session.totalQuestions
       },
       status: 200
     };

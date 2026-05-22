@@ -1,10 +1,13 @@
 export type StudyQuestionCandidate = {
   id: string;
   order: number;
-  lastAnsweredAt?: Date | string | null;
+  dueAt?: Date | string | null;
+  hasStudyState?: boolean;
 };
 
-function toAnsweredTime(value: Date | string | null | undefined) {
+export type Rng = () => number;
+
+function toTime(value: Date | string | null | undefined) {
   if (!value) {
     return null;
   }
@@ -13,31 +16,55 @@ function toAnsweredTime(value: Date | string | null | undefined) {
   return Number.isNaN(time) ? null : time;
 }
 
+export function shuffleWithRng<T>(items: T[], rng: Rng = Math.random) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(rng() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [
+      shuffled[randomIndex],
+      shuffled[index]
+    ];
+  }
+
+  return shuffled;
+}
+
 export function selectStudyQuestionIds(
   candidates: StudyQuestionCandidate[],
-  count: number
+  count: number,
+  options: { now?: Date; rng?: Rng } = {}
 ) {
   if (count <= 0) {
     return [];
   }
 
+  const nowTime = (options.now ?? new Date()).getTime();
   const normalized = candidates.map((candidate) => ({
     ...candidate,
-    lastAnsweredTime: toAnsweredTime(candidate.lastAnsweredAt)
+    dueTime: toTime(candidate.dueAt)
   }));
 
-  const unattempted = normalized
-    .filter((candidate) => candidate.lastAnsweredTime === null)
-    .sort((left, right) => left.order - right.order);
+  const ready = normalized.filter(
+    (candidate) =>
+      !candidate.hasStudyState ||
+      candidate.dueTime === null ||
+      candidate.dueTime <= nowTime
+  );
 
-  const attempted = normalized
-    .filter((candidate) => candidate.lastAnsweredTime !== null)
+  const future = normalized
+    .filter(
+      (candidate) =>
+        candidate.hasStudyState &&
+        candidate.dueTime !== null &&
+        candidate.dueTime > nowTime
+    )
     .sort((left, right) => {
-      const timeDiff = left.lastAnsweredTime! - right.lastAnsweredTime!;
+      const timeDiff = left.dueTime! - right.dueTime!;
       return timeDiff === 0 ? left.order - right.order : timeDiff;
     });
 
-  return [...unattempted, ...attempted]
+  return [...shuffleWithRng(ready, options.rng), ...future]
     .slice(0, count)
     .map((candidate) => candidate.id);
 }

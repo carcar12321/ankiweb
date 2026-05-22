@@ -481,6 +481,51 @@ tr:last-child td {
   gap: 8px;
 }
 
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.check-card {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.check-card:hover,
+.check-card:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.check-card input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.check-card span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.check-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 .quiz-shell {
   display: grid;
   gap: 18px;
@@ -571,6 +616,18 @@ tr:last-child td {
   border-color: color-mix(in srgb, var(--danger) 55%, var(--line));
 }
 
+.rating-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rating-button {
+  min-height: 44px;
+  background: var(--surface-muted);
+}
+
 .empty {
   padding: 28px;
   border: 1px dashed var(--line);
@@ -655,7 +712,7 @@ tr:last-child td {
     grid-column: 1 / -1;
     grid-row: 2;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
     overflow: visible;
   }
@@ -734,7 +791,9 @@ tr:last-child td {
     min-height: 44px;
   }
 
-  .quick-options {
+  .quick-options,
+  .check-grid,
+  .rating-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

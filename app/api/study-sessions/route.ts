@@ -1,19 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 
+import { normalizeCategoryFilters } from "@/lib/categories";
 import { prisma } from "@/lib/prisma";
 import { selectStudyQuestionIds } from "@/lib/study-session-logic";
 
 export const runtime = "nodejs";
 
+function categoryWhere(
+  categories: Array<string | null> | null
+): Prisma.QuestionWhereInput {
+  if (!categories) {
+    return {};
+  }
+
+  const values = categories.filter((category): category is string =>
+    Boolean(category)
+  );
+  const includeUncategorized = categories.some((category) => category === null);
+  const filters: Prisma.QuestionWhereInput[] = [];
+
+  if (values.length > 0) {
+    filters.push({ category: { in: values } });
+  }
+
+  if (includeUncategorized) {
+    filters.push({ category: null });
+  }
+
+  return filters.length > 0 ? { OR: filters } : { id: "__NO_MATCH__" };
+}
+
+function uniqueStrings(values: unknown) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter(Boolean)
+    )
+  );
+}
+
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
+    mode?: string;
     setId?: string;
+    setIds?: string[];
+    categories?: Array<string | null>;
     questionCount?: number;
   } | null;
+  const mode = body?.mode === "RANDOM" ? "RANDOM" : "SET";
+  const categories = normalizeCategoryFilters(body?.categories);
 
-  if (!body?.setId) {
+  if (!body) {
     return NextResponse.json(
-      { ok: false, message: "문제 세트를 찾을 수 없습니다." },
+      { ok: false, message: "학습 세션 정보를 확인할 수 없습니다." },
       { status: 400 }
     );
   }
@@ -22,39 +67,145 @@ export async function POST(request: NextRequest) {
 
   if (!Number.isInteger(questionCount)) {
     return NextResponse.json(
-      { ok: false, message: "공부할 문제 개수를 숫자로 입력해주세요." },
+      { ok: false, message: "풀 문제 개수를 숫자로 입력해주세요." },
       { status: 400 }
     );
   }
 
-  const set = await prisma.questionSet.findUnique({
-    where: { id: body.setId },
-    include: {
-      questions: {
-        orderBy: { order: "asc" },
-        include: {
-          attempts: {
-            orderBy: { answeredAt: "desc" },
-            select: { answeredAt: true },
-            take: 1
-          }
+  if (categories && categories.length === 0) {
+    return NextResponse.json(
+      { ok: false, message: "최소 1개 이상의 part를 선택해주세요." },
+      { status: 400 }
+    );
+  }
+
+  if (mode === "SET") {
+    if (!body.setId) {
+      return NextResponse.json(
+        { ok: false, message: "문제집을 찾을 수 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    const set = await prisma.questionSet.findUnique({
+      where: { id: body.setId },
+      include: {
+        questions: {
+          where: categoryWhere(categories),
+          orderBy: { order: "asc" },
+          include: { studyState: true }
         }
       }
+    });
+
+    if (!set) {
+      return NextResponse.json(
+        { ok: false, message: "문제집을 찾을 수 없습니다." },
+        { status: 404 }
+      );
     }
+
+    const totalQuestions = set.questions.length;
+
+    if (totalQuestions === 0) {
+      return NextResponse.json(
+        { ok: false, message: "선택한 범위에 문제가 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    if (questionCount < 1 || questionCount > totalQuestions) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `풀 문제 개수는 1개부터 ${totalQuestions}개까지 가능합니다.`
+        },
+        { status: 400 }
+      );
+    }
+
+    const selectedQuestionIds = selectStudyQuestionIds(
+      set.questions.map((question) => ({
+        id: question.id,
+        order: question.order,
+        dueAt: question.studyState?.dueAt ?? null,
+        hasStudyState: Boolean(question.studyState)
+      })),
+      questionCount
+    );
+
+    const now = new Date();
+    const session = await prisma.$transaction(async (transaction) => {
+      await transaction.studySession.updateMany({
+        where: {
+          mode: "SET",
+          setId: set.id,
+          status: "ACTIVE"
+        },
+        data: {
+          status: "ABANDONED",
+          abandonedAt: now
+        }
+      });
+
+      return transaction.studySession.create({
+        data: {
+          setId: set.id,
+          mode: "SET",
+          algorithm: "SM2",
+          totalQuestions: selectedQuestionIds.length,
+          items: {
+            create: selectedQuestionIds.map((questionId, position) => ({
+              questionId,
+              position
+            }))
+          }
+        },
+        select: { id: true }
+      });
+    });
+
+    return NextResponse.json({
+      ok: true,
+      mode,
+      sessionId: session.id
+    });
+  }
+
+  const setIds = uniqueStrings(body.setIds);
+
+  if (setIds.length === 0) {
+    return NextResponse.json(
+      { ok: false, message: "랜덤학습에 사용할 문제집을 선택해주세요." },
+      { status: 400 }
+    );
+  }
+
+  const sets = await prisma.questionSet.findMany({
+    where: { id: { in: setIds } },
+    select: { id: true }
   });
 
-  if (!set) {
+  if (sets.length !== setIds.length) {
     return NextResponse.json(
-      { ok: false, message: "문제 세트를 찾을 수 없습니다." },
+      { ok: false, message: "선택한 문제집 중 찾을 수 없는 항목이 있습니다." },
       { status: 404 }
     );
   }
 
-  const totalQuestions = set.questions.length;
+  const questions = await prisma.question.findMany({
+    where: {
+      setId: { in: setIds },
+      ...categoryWhere(categories)
+    },
+    orderBy: [{ setId: "asc" }, { order: "asc" }],
+    include: { studyState: true }
+  });
+  const totalQuestions = questions.length;
 
   if (totalQuestions === 0) {
     return NextResponse.json(
-      { ok: false, message: "이 세트에는 아직 문제가 없습니다." },
+      { ok: false, message: "선택한 범위에 문제가 없습니다." },
       { status: 400 }
     );
   }
@@ -63,26 +214,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        message: `공부할 문제 개수는 1개부터 ${totalQuestions}개까지 가능합니다.`
+        message: `풀 문제 개수는 1개부터 ${totalQuestions}개까지 가능합니다.`
       },
       { status: 400 }
     );
   }
 
   const selectedQuestionIds = selectStudyQuestionIds(
-    set.questions.map((question) => ({
+    questions.map((question, index) => ({
       id: question.id,
-      order: question.order,
-      lastAnsweredAt: question.attempts[0]?.answeredAt ?? null
+      order: index + 1,
+      dueAt: question.studyState?.dueAt ?? null,
+      hasStudyState: Boolean(question.studyState)
     })),
     questionCount
   );
-
   const now = new Date();
   const session = await prisma.$transaction(async (transaction) => {
     await transaction.studySession.updateMany({
       where: {
-        setId: set.id,
+        mode: "RANDOM",
         status: "ACTIVE"
       },
       data: {
@@ -93,8 +244,13 @@ export async function POST(request: NextRequest) {
 
     return transaction.studySession.create({
       data: {
-        setId: set.id,
+        setId: null,
+        mode: "RANDOM",
+        algorithm: "SM2",
         totalQuestions: selectedQuestionIds.length,
+        sourceSets: {
+          create: setIds.map((setId) => ({ setId }))
+        },
         items: {
           create: selectedQuestionIds.map((questionId, position) => ({
             questionId,
@@ -108,6 +264,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    mode,
     sessionId: session.id
   });
 }

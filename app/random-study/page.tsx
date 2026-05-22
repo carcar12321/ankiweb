@@ -1,19 +1,18 @@
 import { notFound, redirect } from "next/navigation";
 
-import { StudyStartPanel } from "@/components/study-start-panel";
+import { RandomStudyStartPanel } from "@/components/random-study-start-panel";
 import { StudySession } from "@/components/study-session";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  params: Promise<{ setId: string }> | { setId: string };
   searchParams:
     | Promise<{ sessionId?: string | string[] }>
     | { sessionId?: string | string[] };
 };
 
-function buildPartOptions(questions: Array<{ category: string | null }>) {
+function buildParts(questions: Array<{ category: string | null }>) {
   const counts = new Map<string, { category: string | null; count: number }>();
 
   questions.forEach((question) => {
@@ -30,51 +29,42 @@ function buildPartOptions(questions: Array<{ category: string | null }>) {
   );
 }
 
-export default async function StudyPage({ params, searchParams }: PageProps) {
-  const { setId } = await params;
+export default async function RandomStudyPage({ searchParams }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const requestedSessionId = Array.isArray(resolvedSearchParams.sessionId)
     ? resolvedSearchParams.sessionId[0]
     : resolvedSearchParams.sessionId;
 
-  const set = await prisma.questionSet.findUnique({
-    where: { id: setId },
-    select: {
-      id: true,
-      title: true,
-      questions: {
-        select: { category: true }
-      },
-      _count: {
-        select: { questions: true }
-      }
-    }
-  });
-
-  if (!set) {
-    notFound();
-  }
-
   if (!requestedSessionId) {
-    const activeSession = await prisma.studySession.findFirst({
-      where: {
-        mode: "SET",
-        setId: set.id,
-        status: "ACTIVE"
-      },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        totalQuestions: true,
-        currentIndex: true,
-        correctCount: true,
-        updatedAt: true
-      }
-    });
+    const [sets, activeSession] = await Promise.all([
+      prisma.questionSet.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          questions: {
+            select: { category: true }
+          },
+          _count: { select: { questions: true } }
+        }
+      }),
+      prisma.studySession.findFirst({
+        where: {
+          mode: "RANDOM",
+          status: "ACTIVE"
+        },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          totalQuestions: true,
+          currentIndex: true,
+          correctCount: true,
+          updatedAt: true
+        }
+      })
+    ]);
 
     return (
       <main className="page page-narrow">
-        <StudyStartPanel
+        <RandomStudyStartPanel
           activeSession={
             activeSession
               ? {
@@ -83,10 +73,12 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
                 }
               : null
           }
-          partOptions={buildPartOptions(set.questions)}
-          setId={set.id}
-          setTitle={set.title}
-          totalQuestions={set._count.questions}
+          sets={sets.map((set) => ({
+            id: set.id,
+            title: set.title,
+            totalQuestions: set._count.questions,
+            parts: buildParts(set.questions)
+          }))}
         />
       </main>
     );
@@ -97,17 +89,21 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
     include: {
       items: {
         orderBy: { position: "asc" },
-        include: { question: true }
+        include: {
+          question: {
+            include: { set: true }
+          }
+        }
       }
     }
   });
 
-  if (!session || session.setId !== set.id || session.mode !== "SET") {
+  if (!session || session.mode !== "RANDOM") {
     notFound();
   }
 
   if (session.status === "ABANDONED") {
-    redirect(`/study/${set.id}`);
+    redirect("/random-study");
   }
 
   const questions = session.items.map((item) => ({
@@ -124,6 +120,7 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
     selected: item.selected,
     isCorrect: item.isCorrect,
     answeredAt: item.answeredAt?.toISOString() ?? null,
+    setTitle: item.question.set.title,
     tag: item.question.tag,
     category: item.question.category
   }));
@@ -135,8 +132,8 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
         initialIndex={Math.min(session.currentIndex, questions.length)}
         questions={questions}
         sessionId={session.id}
-        setupHref={`/study/${set.id}`}
-        setTitle={set.title}
+        setupHref="/random-study"
+        setTitle="랜덤학습"
       />
     </main>
   );
