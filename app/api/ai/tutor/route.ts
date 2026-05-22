@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAiApiKeyFromCookie } from "@/lib/ai-session";
 import { buildTutorPrompt } from "@/lib/ai-context";
+import { persistAiExchange, makeConversationTitle } from "@/lib/ai-persistence";
+import { composeInstructions, getAiSettings } from "@/lib/ai-settings";
 import { AiAuthError, createAiText } from "@/lib/openai-api";
 import { prisma } from "@/lib/prisma";
 
@@ -17,6 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => null)) as {
+    conversationId?: string;
     currentIndex?: number;
     message?: string;
     mode?: "chat" | "explain";
@@ -82,42 +85,63 @@ export async function POST(request: NextRequest) {
   });
 
   try {
+    const settings = await getAiSettings();
+    const userPrompt = buildTutorPrompt({
+      context: {
+        category: item.question.category,
+        choices: {
+          A: item.question.choiceA,
+          B: item.question.choiceB,
+          C: item.question.choiceC,
+          D: item.question.choiceD
+        },
+        correct: item.question.correct,
+        explanation: item.question.explanation,
+        prompt: item.question.prompt,
+        selected: item.selected,
+        tag: item.question.tag
+      },
+      message: body.message,
+      mode: body.mode ?? "explain",
+      weakness: {
+        activeWrongNotes: wrongNotes.length,
+        frequentParts: Array.from(partCounts.entries()).map(([category, count]) => ({
+          category,
+          count
+        })),
+        recentRatings: recentLogs.map((log) => ({
+          category: log.question.category ?? "미분류",
+          rating: log.rating
+        }))
+      }
+    });
     const answer = await createAiText({
       apiKey,
-      instructions:
+      instructions: composeInstructions(
         "당신은 한국어로 설명하는 개인 학습 튜터입니다. 사용자가 외우기보다 이해하도록 돕고, 답을 과장하거나 지어내지 마세요.",
-      prompt: buildTutorPrompt({
-        context: {
-          category: item.question.category,
-          choices: {
-            A: item.question.choiceA,
-            B: item.question.choiceB,
-            C: item.question.choiceC,
-            D: item.question.choiceD
-          },
-          correct: item.question.correct,
-          explanation: item.question.explanation,
-          prompt: item.question.prompt,
-          selected: item.selected,
-          tag: item.question.tag
-        },
-        message: body.message,
-        mode: body.mode ?? "explain",
-        weakness: {
-          activeWrongNotes: wrongNotes.length,
-          frequentParts: Array.from(partCounts.entries()).map(([category, count]) => ({
-            category,
-            count
-          })),
-          recentRatings: recentLogs.map((log) => ({
-            category: log.question.category ?? "미분류",
-            rating: log.rating
-          }))
-        }
-      })
+        settings
+      ),
+      model: settings.model,
+      prompt: userPrompt,
+      reasoningEffort: settings.reasoningEffort
+    });
+    const conversation = await persistAiExchange({
+      assistant: answer,
+      conversationId: body.conversationId,
+      model: settings.model,
+      scope: "TUTOR",
+      sourceQuestionId: item.question.id,
+      sourceSessionId: session.id,
+      title: makeConversationTitle("문제 해설", item.question.prompt),
+      user: body.message?.trim() || "자세한 해설 요청"
     });
 
-    return NextResponse.json({ ok: true, answer });
+    return NextResponse.json({
+      ok: true,
+      answer,
+      conversationId: conversation.id,
+      model: settings.model
+    });
   } catch (error) {
     return NextResponse.json(
       {

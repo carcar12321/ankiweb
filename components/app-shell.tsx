@@ -2,9 +2,11 @@
 
 import {
   BookOpen,
+  Bot,
   FileUp,
   Home,
   Moon,
+  NotebookPen,
   PanelTop,
   Shuffle,
   Sparkles,
@@ -13,6 +15,8 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+
+import { SelectionMemoMenu } from "@/components/selection-memo-menu";
 
 type ThemeMode = "default" | "dark" | "excel";
 
@@ -29,6 +33,8 @@ const themeModes: Array<{
 const navItems = [
   { href: "/", label: "대시보드", icon: Home },
   { href: "/random-study", label: "랜덤학습", icon: Shuffle },
+  { href: "/ai-study", label: "AI 학습", icon: Bot },
+  { href: "/memos", label: "메모장", icon: NotebookPen },
   { href: "/upload", label: "업로드", icon: FileUp },
   { href: "/wrong-notes", label: "오답노트", icon: BookOpen },
   { href: "/generated-questions", label: "AI 초안", icon: Sparkles }
@@ -106,6 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {children}
+      <SelectionMemoMenu />
     </div>
   );
 }

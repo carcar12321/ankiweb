@@ -36,8 +36,12 @@ export function AiTutorPanel({
   );
   const [error, setError] = useState<string | null>(null);
   const [draftCount, setDraftCount] = useState(0);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
 
   useEffect(() => {
+    setConversationId(null);
+    setCurrentModel(null);
     setDraft("");
     setDraftCount(0);
     setError(null);
@@ -70,6 +74,7 @@ export function AiTutorPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         currentIndex,
+        conversationId,
         message,
         mode,
         questionId,
@@ -77,7 +82,7 @@ export function AiTutorPanel({
       })
     });
     const body = (await response.json().catch(() => null)) as
-      | { ok: true; answer: string }
+      | { ok: true; answer: string; conversationId: string; model: string }
       | AiError
       | null;
 
@@ -97,6 +102,8 @@ export function AiTutorPanel({
       return;
     }
 
+    setConversationId(body.conversationId);
+    setCurrentModel(body.model);
     setMessages([
       ...nextMessages,
       {
@@ -120,7 +127,7 @@ export function AiTutorPanel({
       body: JSON.stringify({ count: 3, questionId })
     });
     const body = (await response.json().catch(() => null)) as
-      | { ok: true; drafts: Array<{ id: string }> }
+      | { ok: true; drafts: Array<{ id: string }>; model?: string }
       | AiError
       | null;
 
@@ -140,6 +147,7 @@ export function AiTutorPanel({
       return;
     }
 
+    setCurrentModel(body.model ?? currentModel);
     setDraftCount(body.drafts.length);
   }
 
@@ -152,6 +160,7 @@ export function AiTutorPanel({
           현재 문제와 최소 학습 요약만 보내서 해설, 추가 질문, 유사 문제 생성을
           요청합니다.
         </p>
+        {currentModel ? <span className="pill">호출 모델 {currentModel}</span> : null}
       </div>
 
       <AiKeyGate>

@@ -4,6 +4,12 @@ import { CheckCircle2, ChevronRight, RotateCcw, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import {
+  shuffleChoiceOrder,
+  toDisplayedChoices,
+  toDisplayChoice,
+  toOriginalChoice
+} from "@/lib/choice-order";
 import type { Choice } from "@/lib/study-logic";
 
 type WrongNoteItem = {
@@ -11,6 +17,7 @@ type WrongNoteItem = {
   wrongCount: number;
   lastWrongAt: string;
   question: {
+    choiceOrder?: string;
     id: string;
     prompt: string;
     choices: Record<Choice, string>;
@@ -27,7 +34,19 @@ type AnswerResult = {
 };
 
 export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
-  const [queue, setQueue] = useState(notes);
+  const [queue, setQueue] = useState(() =>
+    notes.map((note) => {
+      const choiceOrder = shuffleChoiceOrder();
+      return {
+        ...note,
+        question: {
+          ...note.question,
+          choiceOrder,
+          choices: toDisplayedChoices(choiceOrder, note.question.choices)
+        }
+      };
+    })
+  );
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<Choice | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
@@ -41,18 +60,28 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
     }
 
     setPending(true);
+    const originalSelected = toOriginalChoice(
+      current.question.choiceOrder ?? "ABCD",
+      selected
+    );
     const response = await fetch("/api/attempts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         questionId: current.question.id,
-        selected,
+        selected: originalSelected,
         reviewMode: true
       })
     });
     const body = (await response.json()) as AnswerResult;
     setPending(false);
-    setResult(body);
+    setResult({
+      ...body,
+      correctChoice: toDisplayChoice(
+        current.question.choiceOrder ?? "ABCD",
+        body.correctChoice
+      )
+    });
     setReviewed((value) => value + 1);
   }
 
@@ -76,7 +105,19 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
   }
 
   function restart() {
-    setQueue(notes);
+    setQueue(
+      notes.map((note) => {
+        const choiceOrder = shuffleChoiceOrder();
+        return {
+          ...note,
+          question: {
+            ...note.question,
+            choiceOrder,
+            choices: toDisplayedChoices(choiceOrder, note.question.choices)
+          }
+        };
+      })
+    );
     setIndex(0);
     setSelected(null);
     setResult(null);

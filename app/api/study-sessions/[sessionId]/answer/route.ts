@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { toDisplayChoice, toOriginalChoice } from "@/lib/choice-order";
 import { prisma } from "@/lib/prisma";
 import { normalizeChoice, scoreAnswer } from "@/lib/study-logic";
 
@@ -88,8 +89,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
         body: {
           ok: true,
           isCorrect: currentItem.isCorrect,
-          correctChoice: currentItem.question.correct,
-          selectedChoice: currentItem.selected,
+          correctChoice: toDisplayChoice(
+            currentItem.choiceOrder,
+            currentItem.question.correct
+          ),
+          selectedChoice: toDisplayChoice(
+            currentItem.choiceOrder,
+            currentItem.selected
+          ),
           explanation: currentItem.question.explanation,
           currentIndex: session.currentIndex,
           totalQuestions: session.totalQuestions
@@ -98,7 +105,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       };
     }
 
-    const outcome = scoreAnswer(currentItem.question.correct, selected);
+    const originalSelected = toOriginalChoice(currentItem.choiceOrder, selected);
+    const outcome = scoreAnswer(currentItem.question.correct, originalSelected);
     const now = new Date();
 
     await transaction.attempt.create({
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         questionId: currentItem.question.id,
         setId: currentItem.question.setId,
         sessionId: session.id,
-        selected,
+        selected: originalSelected,
         isCorrect: outcome.isCorrect
       }
     });
@@ -114,7 +122,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     await transaction.studySessionItem.update({
       where: { id: currentItem.id },
       data: {
-        selected,
+        selected: originalSelected,
         isCorrect: outcome.isCorrect,
         answeredAt: now
       }
@@ -124,7 +132,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       body: {
         ok: true,
         isCorrect: outcome.isCorrect,
-        correctChoice: outcome.correctChoice,
+        correctChoice: toDisplayChoice(
+          currentItem.choiceOrder,
+          outcome.correctChoice
+        ),
         selectedChoice: selected,
         explanation: currentItem.question.explanation,
         currentIndex: session.currentIndex,

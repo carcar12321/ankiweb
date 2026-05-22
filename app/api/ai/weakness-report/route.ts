@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAiApiKeyFromCookie } from "@/lib/ai-session";
 import { buildWeaknessPrompt } from "@/lib/ai-context";
+import { persistAiExchange } from "@/lib/ai-persistence";
+import { composeInstructions, getAiSettings } from "@/lib/ai-settings";
 import { AiAuthError, createAiText } from "@/lib/openai-api";
 import { prisma } from "@/lib/prisma";
 
@@ -43,28 +45,46 @@ export async function POST() {
   ]);
 
   try {
+    const settings = await getAiSettings();
+    const prompt = buildWeaknessPrompt({
+      activeWrongNotes: wrongNotes.map((note) => ({
+        category: note.question.category,
+        prompt: note.question.prompt,
+        setTitle: note.question.set.title,
+        tag: note.question.tag,
+        wrongCount: note.wrongCount
+      })),
+      recentRatings: recentLogs.map((log) => ({
+        category: log.question.category,
+        prompt: log.question.prompt,
+        rating: log.rating,
+        tag: log.question.tag
+      }))
+    });
     const report = await createAiText({
       apiKey,
-      instructions:
+      instructions: composeInstructions(
         "당신은 학습 기록을 분석하는 한국어 학습 코치입니다. 근거가 있는 패턴만 말하고, 다음 행동을 짧고 구체적으로 제안하세요.",
-      prompt: buildWeaknessPrompt({
-        activeWrongNotes: wrongNotes.map((note) => ({
-          category: note.question.category,
-          prompt: note.question.prompt,
-          setTitle: note.question.set.title,
-          tag: note.question.tag,
-          wrongCount: note.wrongCount
-        })),
-        recentRatings: recentLogs.map((log) => ({
-          category: log.question.category,
-          prompt: log.question.prompt,
-          rating: log.rating,
-          tag: log.question.tag
-        }))
-      })
+        settings
+      ),
+      model: settings.model,
+      prompt,
+      reasoningEffort: settings.reasoningEffort
+    });
+    const conversation = await persistAiExchange({
+      assistant: report,
+      model: settings.model,
+      scope: "WEAKNESS",
+      title: "오답 기반 약점 분석",
+      user: "오답노트와 최근 자가평가 기반 약점 분석 요청"
     });
 
-    return NextResponse.json({ ok: true, report });
+    return NextResponse.json({
+      ok: true,
+      conversationId: conversation.id,
+      model: settings.model,
+      report
+    });
   } catch (error) {
     return NextResponse.json(
       {

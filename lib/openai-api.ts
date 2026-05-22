@@ -1,3 +1,5 @@
+import { defaultAiModel, type AiReasoningEffort } from "@/lib/ai-models";
+
 type ResponseTextFormat = {
   description?: string;
   name: string;
@@ -21,8 +23,6 @@ export class AiAuthError extends Error {}
 export class AiRequestError extends Error {}
 
 const openAiUrl = "https://api.openai.com/v1/responses";
-
-export const defaultAiModel = "gpt-5.2";
 
 function extractOutputText(response: OpenAiResponse) {
   if (typeof response.output_text === "string") {
@@ -54,6 +54,7 @@ export async function createAiText(input: {
   instructions: string;
   model?: string;
   prompt: string;
+  reasoningEffort?: AiReasoningEffort | string;
   textFormat?: ResponseTextFormat;
 }) {
   const response = await fetch(openAiUrl, {
@@ -66,6 +67,9 @@ export async function createAiText(input: {
       input: input.prompt,
       instructions: input.instructions,
       model: input.model ?? process.env.OPENAI_MODEL ?? defaultAiModel,
+      reasoning: input.reasoningEffort
+        ? { effort: input.reasoningEffort }
+        : undefined,
       text: input.textFormat ? { format: input.textFormat } : undefined
     })
   });
@@ -97,6 +101,7 @@ export async function createAiJson<T>(input: {
   instructions: string;
   model?: string;
   prompt: string;
+  reasoningEffort?: AiReasoningEffort | string;
   textFormat: ResponseTextFormat;
 }) {
   const text = await createAiText(input);

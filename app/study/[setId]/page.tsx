@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { StudyStartPanel } from "@/components/study-start-panel";
 import { StudySession } from "@/components/study-session";
+import { toDisplayedChoices, toDisplayChoice } from "@/lib/choice-order";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -117,15 +118,18 @@ export default async function StudyPage({ params, searchParams }: PageProps) {
   const questions = session.items.map((item) => ({
     id: item.question.id,
     prompt: item.question.prompt,
-    choices: {
+    choiceOrder: item.choiceOrder,
+    choices: toDisplayedChoices(item.choiceOrder, {
       A: item.question.choiceA,
       B: item.question.choiceB,
       C: item.question.choiceC,
       D: item.question.choiceD
-    },
-    correctChoice: item.answeredAt ? item.question.correct : null,
+    }),
+    correctChoice: item.answeredAt
+      ? toDisplayChoice(item.choiceOrder, item.question.correct)
+      : null,
     explanation: item.answeredAt ? item.question.explanation : null,
-    selected: item.selected,
+    selected: item.selected ? toDisplayChoice(item.choiceOrder, item.selected) : null,
     isCorrect: item.isCorrect,
     answeredAt: item.answeredAt?.toISOString() ?? null,
     rating: item.rating,

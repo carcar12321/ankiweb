@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAiApiKeyFromCookie } from "@/lib/ai-session";
-import { buildSimilarQuestionPrompt } from "@/lib/ai-context";
+import { buildPromptQuestionGeneration } from "@/lib/ai-context";
 import { persistAiExchange, makeConversationTitle } from "@/lib/ai-persistence";
 import { composeInstructions, getAiSettings } from "@/lib/ai-settings";
 import { AiAuthError, createAiJson } from "@/lib/openai-api";
@@ -10,8 +10,9 @@ import { isChoice, type Choice } from "@/lib/study-logic";
 
 export const runtime = "nodejs";
 
-type SimilarQuestionResponse = {
+type GeneratedQuestions = {
   questions: Array<{
+    category?: string | null;
     choiceA: string;
     choiceB: string;
     choiceC: string;
@@ -20,16 +21,18 @@ type SimilarQuestionResponse = {
     explanation: string;
     prompt: string;
     rationale: string;
+    tag?: string | null;
   }>;
 };
 
-const similarQuestionSchema = {
+const generatedQuestionSchema = {
   additionalProperties: false,
   properties: {
     questions: {
       items: {
         additionalProperties: false,
         properties: {
+          category: { type: ["string", "null"] },
           choiceA: { type: "string" },
           choiceB: { type: "string" },
           choiceC: { type: "string" },
@@ -37,7 +40,8 @@ const similarQuestionSchema = {
           correct: { enum: ["A", "B", "C", "D"], type: "string" },
           explanation: { type: "string" },
           prompt: { type: "string" },
-          rationale: { type: "string" }
+          rationale: { type: "string" },
+          tag: { type: ["string", "null"] }
         },
         required: [
           "prompt",
@@ -47,7 +51,9 @@ const similarQuestionSchema = {
           "choiceD",
           "correct",
           "explanation",
-          "rationale"
+          "rationale",
+          "category",
+          "tag"
         ],
         type: "object"
       },
@@ -69,62 +75,50 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as {
     count?: number;
-    questionId?: string;
+    prompt?: string;
+    setId?: string;
   } | null;
-  const requestedCount = Number(body?.count ?? 3);
+  const promptText = body?.prompt?.trim();
+  const setId = body?.setId?.trim();
+  const requestedCount = Number(body?.count ?? 5);
   const count = Number.isFinite(requestedCount)
-    ? Math.min(5, Math.max(1, Math.trunc(requestedCount)))
-    : 3;
+    ? Math.min(10, Math.max(1, Math.trunc(requestedCount)))
+    : 5;
 
-  if (!body?.questionId) {
+  if (!promptText || !setId) {
     return NextResponse.json(
-      { ok: false, message: "기준 문제가 필요합니다." },
+      { ok: false, message: "저장할 문제집과 생성 요청을 입력해주세요." },
       { status: 400 }
     );
   }
 
-  const question = await prisma.question.findUnique({
-    where: { id: body.questionId }
+  const set = await prisma.questionSet.findUnique({
+    where: { id: setId },
+    select: { id: true, title: true }
   });
-
-  if (!question) {
+  if (!set) {
     return NextResponse.json(
-      { ok: false, message: "기준 문제를 찾을 수 없습니다." },
+      { ok: false, message: "문제집을 찾을 수 없습니다." },
       { status: 404 }
     );
   }
 
   try {
     const settings = await getAiSettings();
-    const prompt = buildSimilarQuestionPrompt({
-      count,
-      question: {
-        category: question.category,
-        choices: {
-          A: question.choiceA,
-          B: question.choiceB,
-          C: question.choiceC,
-          D: question.choiceD
-        },
-        correct: question.correct,
-        explanation: question.explanation,
-        prompt: question.prompt,
-        tag: question.tag
-      }
-    });
-    const generated = await createAiJson<SimilarQuestionResponse>({
+    const prompt = buildPromptQuestionGeneration({ count, prompt: promptText });
+    const generated = await createAiJson<GeneratedQuestions>({
       apiKey,
       instructions: composeInstructions(
-        "당신은 고품질 객관식 문제를 만드는 한국어 출제자입니다. 반드시 JSON 스키마에 맞는 유사 문제만 생성하세요.",
+        "당신은 학습용 객관식 문제를 만드는 한국어 출제자입니다. 반드시 JSON 스키마에 맞는 문제만 생성하세요.",
         settings
       ),
       model: settings.model,
       prompt,
       reasoningEffort: settings.reasoningEffort,
       textFormat: {
-        description: "Generated similar multiple-choice questions",
-        name: "similar_questions",
-        schema: similarQuestionSchema,
+        description: "Generated multiple-choice questions from a free-form prompt",
+        name: "prompt_questions",
+        schema: generatedQuestionSchema,
         strict: true,
         type: "json_schema"
       }
@@ -144,7 +138,7 @@ export async function POST(request: NextRequest) {
       validQuestions.map((item) =>
         prisma.generatedQuestionDraft.create({
           data: {
-            category: question.category,
+            category: item.category?.trim() || null,
             choiceA: item.choiceA,
             choiceB: item.choiceB,
             choiceC: item.choiceC,
@@ -153,30 +147,25 @@ export async function POST(request: NextRequest) {
             explanation: item.explanation,
             prompt: item.prompt,
             rationale: item.rationale,
-            setId: question.setId,
-            sourceQuestionId: question.id,
-            tag: question.tag
+            setId: set.id,
+            sourceQuestionId: null,
+            tag: item.tag?.trim() || null
           }
         })
       )
     );
     const conversation = await persistAiExchange({
-      assistant: `${drafts.length}개의 유사 문제 초안을 생성했습니다.`,
+      assistant: `${drafts.length}개의 문제 초안을 생성했습니다.`,
       model: settings.model,
       scope: "QUESTION_GENERATION",
-      sourceQuestionId: question.id,
-      title: makeConversationTitle("유사 문제 생성", question.prompt),
-      user: prompt
+      title: makeConversationTitle("프롬프트 문제 생성", promptText),
+      user: promptText
     });
 
     return NextResponse.json({
       ok: true,
       conversationId: conversation.id,
-      drafts: drafts.map((draft) => ({
-        id: draft.id,
-        prompt: draft.prompt,
-        rationale: draft.rationale
-      })),
+      drafts: drafts.map((draft) => ({ id: draft.id, prompt: draft.prompt })),
       model: settings.model
     });
   } catch (error) {
@@ -186,7 +175,7 @@ export async function POST(request: NextRequest) {
         message:
           error instanceof AiAuthError
             ? "API 키를 다시 입력해주세요."
-            : "유사 문제를 생성하지 못했습니다."
+            : "문제를 생성하지 못했습니다."
       },
       { status: error instanceof AiAuthError ? 401 : 502 }
     );

@@ -702,6 +702,28 @@ tr:last-child td {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
 }
 
+.memo-content {
+  margin-bottom: 0;
+  white-space: pre-wrap;
+}
+
+.selection-memo-menu {
+  position: fixed;
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.selection-memo-menu small {
+  color: var(--danger);
+}
+
 .feedback.correct {
   border-color: color-mix(in srgb, var(--success) 55%, var(--line));
 }
@@ -806,7 +828,7 @@ tr:last-child td {
     grid-column: 1 / -1;
     grid-row: 2;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
     gap: 4px;
     overflow: visible;
   }

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { AiTutorPanel } from "@/components/ai-tutor-panel";
+import { SessionAiReportPanel } from "@/components/session-ai-report-panel";
 import type { ReviewRating } from "@/lib/scheduler";
 import { buildSessionReport } from "@/lib/study-insights";
 import type { Choice } from "@/lib/study-logic";
@@ -20,6 +21,7 @@ import type { Choice } from "@/lib/study-logic";
 type StudyQuestion = {
   answeredAt?: string | null;
   category?: string | null;
+  choiceOrder: string;
   choices: Record<Choice, string>;
   correctChoice?: Choice | null;
   explanation?: string | null;
@@ -282,75 +284,83 @@ export function StudySession({
 
   if (complete) {
     return (
-      <section className="panel quiz-shell">
-        <p className="eyebrow">SESSION COMPLETE</p>
-        <h1>{setTitle}</h1>
-        <div className="report-grid">
-          <div className="status-box">
-            <strong>{formatPercent(report.accuracy)}</strong>
-            <span>정답률</span>
+      <div className="grid">
+        <section className="panel quiz-shell">
+          <p className="eyebrow">SESSION COMPLETE</p>
+          <h1>{setTitle}</h1>
+          <div className="report-grid">
+            <div className="status-box">
+              <strong>{formatPercent(report.accuracy)}</strong>
+              <span>정답률</span>
+            </div>
+            <div className="status-box">
+              <strong>
+                {report.correctCount} / {report.answeredCount}
+              </strong>
+              <span>맞힌 문제</span>
+            </div>
+            <div className="status-box">
+              <strong>{formatDueDate(report.nextReview.earliestNextDueAt)}</strong>
+              <span>가장 빠른 다음 복습</span>
+            </div>
           </div>
-          <div className="status-box">
-            <strong>
-              {report.correctCount} / {report.answeredCount}
-            </strong>
-            <span>맞힌 문제</span>
-          </div>
-          <div className="status-box">
-            <strong>{formatDueDate(report.nextReview.earliestNextDueAt)}</strong>
-            <span>가장 빠른 다음 복습</span>
-          </div>
-        </div>
 
-        <div className="pill-row">
-          {ratingOptions.map((option) => (
-            <span className="pill" key={option.value}>
-              {ratingLabels[option.value]} {report.ratingCounts[option.value]}
+          <div className="pill-row">
+            {ratingOptions.map((option) => (
+              <span className="pill" key={option.value}>
+                {ratingLabels[option.value]} {report.ratingCounts[option.value]}
+              </span>
+            ))}
+            <span className="pill">
+              오늘 다시 볼 문제 {report.nextReview.dueTodayCount}
             </span>
-          ))}
-          <span className="pill">
-            오늘 다시 볼 문제 {report.nextReview.dueTodayCount}
-          </span>
-          <span className="pill">예약된 복습 {report.nextReview.futureDueCount}</span>
-        </div>
-
-        {report.partStats.length > 0 ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Part</th>
-                  <th>정답률</th>
-                  <th>어려움</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.partStats.map((part) => (
-                  <tr key={part.part}>
-                    <td data-label="Part">{part.part}</td>
-                    <td data-label="정답률">
-                      {formatPercent(part.total === 0 ? 0 : part.correct / part.total)}
-                    </td>
-                    <td data-label="어려움">
-                      {part.weak} / {part.total}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <span className="pill">예약된 복습 {report.nextReview.futureDueCount}</span>
           </div>
-        ) : null}
 
-        <div className="actions">
-          <Link className="button" href={setupHref}>
-            <RotateCcw size={17} />
-            다시 시작
-          </Link>
-          <Link className="button-ghost" href="/wrong-notes">
-            오답노트 보기
-          </Link>
-        </div>
-      </section>
+          {report.partStats.length > 0 ? (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Part</th>
+                    <th>정답률</th>
+                    <th>어려움</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.partStats.map((part) => (
+                    <tr key={part.part}>
+                      <td data-label="Part">{part.part}</td>
+                      <td data-label="정답률">
+                        {formatPercent(
+                          part.total === 0 ? 0 : part.correct / part.total
+                        )}
+                      </td>
+                      <td data-label="어려움">
+                        {part.weak} / {part.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          <div className="actions">
+            <Link className="button" href={setupHref}>
+              <RotateCcw size={17} />
+              다시 시작
+            </Link>
+            <Link className="button-ghost" href="/ai-study">
+              AI 학습실
+            </Link>
+            <Link className="button-ghost" href="/wrong-notes">
+              오답노트 보기
+            </Link>
+          </div>
+        </section>
+        <SessionAiReportPanel sessionId={sessionId} />
+      </div>
     );
   }
 

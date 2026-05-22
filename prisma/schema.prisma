@@ -48,6 +48,20 @@ enum GeneratedQuestionDraftStatus {
   REJECTED
 }
 
+enum AiConversationScope {
+  GENERAL
+  TUTOR
+  WEAKNESS
+  SESSION_REPORT
+  QUESTION_GENERATION
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
 model QuestionSet {
   id                  String                   @id @default(cuid())
   title               String
@@ -84,6 +98,8 @@ model Question {
   reviewLogs        StudyReviewLog[]
   studySessionItems StudySessionItem[]
   generatedDrafts   GeneratedQuestionDraft[]
+  aiConversations   AiConversation[]
+  memos             StudyMemo[]
 
   @@index([setId, order])
 }
@@ -106,43 +122,47 @@ model Attempt {
 }
 
 model StudySession {
-  id             String                  @id @default(cuid())
-  setId          String?
-  mode           StudySessionMode        @default(SET)
-  algorithm      SchedulerAlgorithm      @default(SM2)
-  status         StudySessionStatus      @default(ACTIVE)
-  currentIndex   Int                     @default(0)
-  totalQuestions Int
-  correctCount   Int                     @default(0)
-  startedAt      DateTime                @default(now())
-  completedAt    DateTime?
-  abandonedAt    DateTime?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  set            QuestionSet?            @relation(fields: [setId], references: [id], onDelete: Cascade)
-  items          StudySessionItem[]
-  attempts       Attempt[]
-  sourceSets     StudySessionSourceSet[]
-  reviewLogs     StudyReviewLog[]
+  id              String                  @id @default(cuid())
+  setId           String?
+  mode            StudySessionMode        @default(SET)
+  algorithm       SchedulerAlgorithm      @default(SM2)
+  status          StudySessionStatus      @default(ACTIVE)
+  currentIndex    Int                     @default(0)
+  totalQuestions  Int
+  correctCount    Int                     @default(0)
+  startedAt       DateTime                @default(now())
+  completedAt     DateTime?
+  abandonedAt     DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  set             QuestionSet?            @relation(fields: [setId], references: [id], onDelete: Cascade)
+  items           StudySessionItem[]
+  attempts        Attempt[]
+  sourceSets      StudySessionSourceSet[]
+  reviewLogs      StudyReviewLog[]
+  aiConversations AiConversation[]
+  memos           StudyMemo[]
+  aiReports       AiSessionReport[]
 
   @@index([setId, status, updatedAt])
   @@index([mode, status, updatedAt])
 }
 
 model StudySessionItem {
-  id         String        @id @default(cuid())
-  sessionId  String
-  questionId String
-  position   Int
-  selected   Choice?
-  isCorrect  Boolean?
-  answeredAt DateTime?
-  rating     ReviewRating?
-  ratedAt    DateTime?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  session    StudySession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  question   Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id          String        @id @default(cuid())
+  sessionId   String
+  questionId  String
+  position    Int
+  choiceOrder String        @default("ABCD")
+  selected    Choice?
+  isCorrect   Boolean?
+  answeredAt  DateTime?
+  rating      ReviewRating?
+  ratedAt     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  session     StudySession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question    Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, position])
   @@index([questionId])
@@ -227,7 +247,7 @@ model WrongNote {
 model GeneratedQuestionDraft {
   id                 String                       @id @default(cuid())
   setId              String
-  sourceQuestionId   String
+  sourceQuestionId   String?
   status             GeneratedQuestionDraftStatus @default(PENDING)
   prompt             String
   choiceA            String
@@ -244,8 +264,88 @@ model GeneratedQuestionDraft {
   updatedAt          DateTime                     @updatedAt
   approvedAt         DateTime?
   set                QuestionSet                  @relation(fields: [setId], references: [id], onDelete: Cascade)
-  sourceQuestion     Question                     @relation(fields: [sourceQuestionId], references: [id], onDelete: Cascade)
+  sourceQuestion     Question?                    @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
 
   @@index([setId, status, createdAt])
   @@index([sourceQuestionId])
+}
+
+model AiSettings {
+  id                 String   @id @default("default")
+  model              String   @default("gpt-5.4-mini")
+  reasoningEffort    String   @default("medium")
+  tone               String   @default("차분하고 쉬운 한국어 학습 코치")
+  customInstructions String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model AiConversation {
+  id               String              @id @default(cuid())
+  scope            AiConversationScope @default(GENERAL)
+  title            String
+  model            String?
+  sourceSessionId  String?
+  sourceQuestionId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  sourceSession    StudySession?       @relation(fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  sourceQuestion   Question?           @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  messages         AiMessage[]
+  memos            StudyMemo[]
+  reports          AiSessionReport[]
+
+  @@index([scope, updatedAt])
+  @@index([sourceSessionId])
+  @@index([sourceQuestionId])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  role           AiMessageRole
+  content        String
+  model          String?
+  createdAt      DateTime       @default(now())
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model StudyMemo {
+  id                   String          @id @default(cuid())
+  title                String?
+  content              String
+  sourceText           String?
+  sourceUrl            String?
+  sourceSessionId      String?
+  sourceQuestionId     String?
+  sourceConversationId String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  sourceSession        StudySession?   @relation(fields: [sourceSessionId], references: [id], onDelete: SetNull)
+  sourceQuestion       Question?       @relation(fields: [sourceQuestionId], references: [id], onDelete: SetNull)
+  sourceConversation   AiConversation? @relation(fields: [sourceConversationId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([sourceSessionId])
+  @@index([sourceQuestionId])
+  @@index([sourceConversationId])
+}
+
+model AiSessionReport {
+  id             String          @id @default(cuid())
+  sessionId      String
+  conversationId String?
+  title          String
+  content        String
+  model          String?
+  prompt         String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  session        StudySession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  conversation   AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([conversationId])
 }

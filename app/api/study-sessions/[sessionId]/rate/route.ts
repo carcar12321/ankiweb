@@ -6,6 +6,7 @@ import {
   scheduleSm2Review,
   type ReviewRating
 } from "@/lib/scheduler";
+import { shuffleChoiceOrder, toDisplayedChoices } from "@/lib/choice-order";
 import { shouldAppendAgainReplay } from "@/lib/study-insights";
 
 export const runtime = "nodejs";
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       currentItem.question.id,
       rating as ReviewRating
     );
+    const replayChoiceOrder = appendAgainReplay ? shuffleChoiceOrder() : null;
     const nextTotalQuestions = session.totalQuestions + (appendAgainReplay ? 1 : 0);
     const complete = nextIndex >= nextTotalQuestions;
     const correctCount = session.correctCount + (currentItem.isCorrect ? 1 : 0);
@@ -166,6 +168,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (appendAgainReplay) {
       await transaction.studySessionItem.create({
         data: {
+          choiceOrder: replayChoiceOrder!,
           sessionId: session.id,
           questionId: currentItem.question.id,
           position: session.totalQuestions
@@ -233,12 +236,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
           ? {
               id: currentItem.question.id,
               prompt: currentItem.question.prompt,
-              choices: {
+              choiceOrder: replayChoiceOrder,
+              choices: toDisplayedChoices(replayChoiceOrder!, {
                 A: currentItem.question.choiceA,
                 B: currentItem.question.choiceB,
                 C: currentItem.question.choiceC,
                 D: currentItem.question.choiceD
-              },
+              }),
               setTitle: session.mode === "RANDOM" ? currentItem.question.set.title : null,
               tag: currentItem.question.tag,
               category: currentItem.question.category
