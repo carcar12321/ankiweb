@@ -245,7 +245,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 C: currentItem.question.choiceC,
                 D: currentItem.question.choiceD
               }),
-              setTitle: session.mode === "RANDOM" ? currentItem.question.set.title : null,
+              setTitle:
+                session.mode === "SET" ? null : currentItem.question.set.title,
               tag: currentItem.question.tag,
               category: currentItem.question.category
             }

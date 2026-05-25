@@ -1,0 +1,1 @@
+ALTER TYPE "StudySessionMode" ADD VALUE 'REVIEW';

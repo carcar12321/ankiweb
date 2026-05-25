@@ -494,19 +494,28 @@ tr:last-child td {
   gap: 10px;
 }
 
+.review-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .review-counts div,
+.review-stat-grid div,
 .report-grid .status-box {
   display: grid;
   gap: 4px;
 }
 
 .review-counts strong,
+.review-stat-grid strong,
 .report-grid strong {
   font-size: 1.55rem;
   line-height: 1;
 }
 
 .review-counts span,
+.review-stat-grid span,
 .report-grid span {
   color: var(--muted);
   font-size: 0.84rem;
@@ -920,6 +929,7 @@ tr:last-child td {
   .check-grid,
   .report-grid,
   .review-counts,
+  .review-stat-grid,
   .rating-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

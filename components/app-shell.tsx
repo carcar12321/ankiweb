@@ -8,6 +8,7 @@ import {
   Moon,
   NotebookPen,
   PanelTop,
+  RotateCcw,
   Shuffle,
   Sparkles,
   Table2
@@ -33,6 +34,7 @@ const themeModes: Array<{
 const navItems = [
   { href: "/", label: "대시보드", icon: Home },
   { href: "/random-study", label: "랜덤학습", icon: Shuffle },
+  { href: "/review", label: "복습하기", icon: RotateCcw },
   { href: "/ai-study", label: "AI 학습", icon: Bot },
   { href: "/memos", label: "메모장", icon: NotebookPen },
   { href: "/upload", label: "업로드", icon: FileUp },

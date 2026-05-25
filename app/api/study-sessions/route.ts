@@ -3,7 +3,10 @@ import type { Prisma } from "@prisma/client";
 
 import { normalizeCategoryFilters } from "@/lib/categories";
 import { prisma } from "@/lib/prisma";
-import { selectStudyQuestionIds } from "@/lib/study-session-logic";
+import {
+  selectStudyQuestionIds,
+  selectWeightedReviewQuestionIds
+} from "@/lib/study-session-logic";
 
 const FIXED_CHOICE_ORDER = "ABCD" as const;
 
@@ -56,7 +59,8 @@ export async function POST(request: NextRequest) {
     questionCount?: number;
     selection?: string;
   } | null;
-  const mode = body?.mode === "RANDOM" ? "RANDOM" : "SET";
+  const mode =
+    body?.mode === "RANDOM" || body?.mode === "REVIEW" ? body.mode : "SET";
   const categories = normalizeCategoryFilters(body?.categories);
   const selection =
     body?.selection === "DUE" || body?.selection === "NEW" ? body.selection : "ALL";
@@ -197,6 +201,104 @@ export async function POST(request: NextRequest) {
       { ok: false, message: "선택한 문제집 중 찾을 수 없는 항목이 있습니다." },
       { status: 404 }
     );
+  }
+
+  if (mode === "REVIEW") {
+    const reviewedQuestions = await prisma.question.findMany({
+      where: {
+        setId: { in: setIds },
+        attempts: { some: {} },
+        ...categoryWhere(categories)
+      },
+      orderBy: [{ setId: "asc" }, { order: "asc" }],
+      include: {
+        attempts: {
+          orderBy: { answeredAt: "desc" },
+          select: { isCorrect: true },
+          take: 1
+        },
+        reviewLogs: {
+          orderBy: { reviewedAt: "desc" },
+          select: { rating: true },
+          take: 1
+        },
+        studyState: true,
+        wrongNote: {
+          select: { status: true }
+        }
+      }
+    });
+    const totalQuestions = reviewedQuestions.length;
+
+    if (totalQuestions === 0) {
+      return NextResponse.json(
+        { ok: false, message: "복습할 풀이 이력이 있는 문제가 없습니다." },
+        { status: 400 }
+      );
+    }
+
+    if (questionCount < 1 || questionCount > totalQuestions) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `총 문제 개수는 1개부터 ${totalQuestions}개까지 가능합니다.`
+        },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date();
+    const selectedQuestionIds = selectWeightedReviewQuestionIds(
+      reviewedQuestions.map((question, index) => ({
+        id: question.id,
+        order: index + 1,
+        dueAt: question.studyState?.dueAt ?? null,
+        hasActiveWrongNote: question.wrongNote?.status === "ACTIVE",
+        hasAttempt: question.attempts.length > 0,
+        lastAttemptWasCorrect: question.attempts[0]?.isCorrect ?? null,
+        lastRating: question.reviewLogs[0]?.rating ?? null
+      })),
+      questionCount,
+      { now }
+    );
+    const session = await prisma.$transaction(async (transaction) => {
+      await transaction.studySession.updateMany({
+        where: {
+          mode: "REVIEW",
+          status: "ACTIVE"
+        },
+        data: {
+          status: "ABANDONED",
+          abandonedAt: now
+        }
+      });
+
+      return transaction.studySession.create({
+        data: {
+          setId: null,
+          mode: "REVIEW",
+          algorithm: "SM2",
+          totalQuestions: selectedQuestionIds.length,
+          sourceSets: {
+            create: setIds.map((setId) => ({ setId }))
+          },
+          items: {
+            create: selectedQuestionIds.map((questionId, position) => ({
+              choiceOrder: FIXED_CHOICE_ORDER,
+              questionId,
+              position
+            }))
+          }
+        },
+        select: { id: true }
+      });
+    });
+
+    return NextResponse.json({
+      ok: true,
+      mode,
+      sessionId: session.id
+    });
   }
 
   const allQuestions = await prisma.question.findMany({

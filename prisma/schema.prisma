@@ -40,6 +40,7 @@ enum SchedulerAlgorithm {
 enum StudySessionMode {
   SET
   RANDOM
+  REVIEW
 }
 
 enum GeneratedQuestionDraftStatus {
