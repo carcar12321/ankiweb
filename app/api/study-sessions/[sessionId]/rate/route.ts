@@ -8,6 +8,7 @@ import {
 } from "@/lib/scheduler";
 import { toDisplayedChoices } from "@/lib/choice-order";
 import { shouldAppendAgainReplay } from "@/lib/study-insights";
+import { getWrongNoteAction } from "@/lib/study-logic";
 
 export const runtime = "nodejs";
 
@@ -20,10 +21,12 @@ type RouteContext = {
 export async function POST(request: NextRequest, context: RouteContext) {
   const { sessionId } = await context.params;
   const body = (await request.json().catch(() => null)) as {
+    keepInWrongNotes?: boolean;
     questionId?: string;
     rating?: string;
   } | null;
   const rating = body?.rating;
+  const keepInWrongNotes = Boolean(body?.keepInWrongNotes);
 
   if (!body?.questionId || !isReviewRating(rating)) {
     return NextResponse.json(
@@ -116,6 +119,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const nextTotalQuestions = session.totalQuestions + (appendAgainReplay ? 1 : 0);
     const complete = nextIndex >= nextTotalQuestions;
     const correctCount = session.correctCount + (currentItem.isCorrect ? 1 : 0);
+    const wrongNoteAction = getWrongNoteAction({
+      isCorrect: currentItem.isCorrect,
+      keepInWrongNotes,
+      reviewMode: true
+    });
 
     await transaction.questionStudyState.upsert({
       where: { questionId: currentItem.question.id },
@@ -189,7 +197,32 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     });
 
-    if (currentItem.isCorrect) {
+    if (wrongNoteAction === "manual") {
+      await transaction.wrongNote.upsert({
+        where: { questionId: currentItem.question.id },
+        create: {
+          questionId: currentItem.question.id,
+          wrongCount: 0,
+          lastWrongAt: now,
+          reviewedAt: null,
+          status: "ACTIVE",
+          manuallyAddedAt: now,
+          dueAt: scheduled.nextDueAt,
+          intervalDays: scheduled.nextIntervalDays,
+          easeFactor: scheduled.nextEaseFactor
+        },
+        update: {
+          wrongCount: 0,
+          lastWrongAt: now,
+          reviewedAt: null,
+          status: "ACTIVE",
+          manuallyAddedAt: now,
+          dueAt: scheduled.nextDueAt,
+          intervalDays: scheduled.nextIntervalDays,
+          easeFactor: scheduled.nextEaseFactor
+        }
+      });
+    } else if (wrongNoteAction === "resolve") {
       await transaction.wrongNote.updateMany({
         where: {
           questionId: currentItem.question.id,
@@ -201,7 +234,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           dueAt: null
         }
       });
-    } else {
+    } else if (wrongNoteAction === "increment") {
       await transaction.wrongNote.upsert({
         where: { questionId: currentItem.question.id },
         create: {
@@ -209,6 +242,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           wrongCount: 1,
           lastWrongAt: now,
           status: "ACTIVE",
+          manuallyAddedAt: null,
           dueAt: scheduled.nextDueAt,
           intervalDays: scheduled.nextIntervalDays,
           easeFactor: scheduled.nextEaseFactor
@@ -217,6 +251,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           wrongCount: { increment: 1 },
           lastWrongAt: now,
           status: "ACTIVE",
+          manuallyAddedAt: null,
           dueAt: scheduled.nextDueAt,
           intervalDays: scheduled.nextIntervalDays,
           easeFactor: scheduled.nextEaseFactor

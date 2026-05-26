@@ -1,6 +1,7 @@
 import { reviewRatings, type ReviewRating } from "@/lib/scheduler";
 
 export const uncategorizedPartLabel = "미분류";
+const uncategorizedPartKey = "__UNCATEGORIZED__";
 
 export type ReviewLoadCandidate = {
   dueAt?: Date | string | null;
@@ -34,6 +35,14 @@ function startOfDay(value: Date) {
 
 function partLabel(category: string | null | undefined) {
   return category && category.length > 0 ? category : uncategorizedPartLabel;
+}
+
+function partKey(category: string | null | undefined) {
+  return category && category.length > 0 ? category : uncategorizedPartKey;
+}
+
+function normalizePartCategory(category: string | null | undefined) {
+  return category && category.length > 0 ? category : null;
 }
 
 export function summarizeReviewLoad(
@@ -87,13 +96,27 @@ export function getWeakPartRecommendations(
 ) {
   const grouped = new Map<
     string,
-    { part: string; total: number; weak: number; again: number; hard: number }
+    {
+      category: string | null;
+      part: string;
+      total: number;
+      weak: number;
+      again: number;
+      hard: number;
+    }
   >();
 
   logs.forEach((log) => {
-    const part = partLabel(log.category);
-    const current =
-      grouped.get(part) ?? { part, total: 0, weak: 0, again: 0, hard: 0 };
+    const category = normalizePartCategory(log.category);
+    const key = partKey(category);
+    const current = grouped.get(key) ?? {
+      category,
+      part: partLabel(category),
+      total: 0,
+      weak: 0,
+      again: 0,
+      hard: 0
+    };
 
     current.total += 1;
 
@@ -109,7 +132,7 @@ export function getWeakPartRecommendations(
       current.hard += 1;
     }
 
-    grouped.set(part, current);
+    grouped.set(key, current);
   });
 
   return Array.from(grouped.values())

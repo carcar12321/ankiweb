@@ -221,6 +221,15 @@ textarea {
   background: color-mix(in srgb, var(--primary) 10%, var(--surface));
 }
 
+.danger-action {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--danger);
+}
+
+.danger-action:hover {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
 .icon-button {
   width: 38px;
   color: var(--muted);
@@ -311,6 +320,18 @@ h3 {
   padding: 20px;
 }
 
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-heading h2 {
+  margin-bottom: 0;
+}
+
 .metric {
   padding: 18px;
 }
@@ -362,6 +383,44 @@ h3 {
   color: var(--muted);
   background: var(--surface-muted);
   font-size: 0.82rem;
+}
+
+.success-pill {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--line));
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+}
+
+.selectable-heading {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.select-check,
+.table-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.select-check input,
+.table-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.keep-wrong-note {
+  width: max-content;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
 }
 
 .table-wrap {
@@ -528,6 +587,19 @@ tr:last-child td {
 
 .study-row:last-child {
   border-bottom: 0;
+}
+
+.study-row-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.recommended-part-action {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
 }
 
 .quick-options {
@@ -797,9 +869,18 @@ tr:last-child td {
   }
 
   .page-header,
-  .set-card {
+  .set-card,
+  .study-row-action {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .recommended-part-action {
+    justify-items: stretch;
+  }
+
+  .selectable-heading {
+    grid-template-columns: 1fr;
   }
 }
 

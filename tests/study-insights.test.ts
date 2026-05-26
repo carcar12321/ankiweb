@@ -63,6 +63,32 @@ describe("study insights", () => {
     });
   });
 
+  it("keeps the source category on weak part recommendations", () => {
+    const [recommendation] = getWeakPartRecommendations([
+      { category: "네트워크", rating: "AGAIN" },
+      { category: "네트워크", rating: "GOOD" }
+    ]);
+
+    expect(recommendation).toMatchObject({
+      again: 1,
+      category: "네트워크",
+      hard: 0,
+      part: "네트워크",
+      total: 2,
+      weak: 1,
+      weakRate: 0.5
+    });
+  });
+
+  it("uses null category for uncategorized recommendations", () => {
+    const [recommendation] = getWeakPartRecommendations([
+      { category: null, rating: "HARD" }
+    ]);
+
+    expect(recommendation.category).toBeNull();
+    expect(recommendation.part).toBe("미분류");
+  });
+
   it("builds a session report with rating and part summaries", () => {
     const report = buildSessionReport(
       [

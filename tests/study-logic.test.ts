@@ -24,6 +24,13 @@ describe("study logic", () => {
     expect(getWrongNoteAction({ isCorrect: true, reviewMode: true })).toBe(
       "resolve"
     );
+    expect(
+      getWrongNoteAction({
+        isCorrect: true,
+        keepInWrongNotes: true,
+        reviewMode: true
+      })
+    ).toBe("manual");
     expect(getWrongNoteAction({ isCorrect: true, reviewMode: false })).toBe(
       "none"
     );

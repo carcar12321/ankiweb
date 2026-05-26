@@ -228,18 +228,20 @@ model StudyReviewLog {
 }
 
 model WrongNote {
-  id           String          @id @default(cuid())
-  questionId   String          @unique
-  wrongCount   Int             @default(1)
-  lastWrongAt  DateTime        @default(now())
-  reviewedAt   DateTime?
-  status       WrongNoteStatus @default(ACTIVE)
-  dueAt        DateTime?
-  intervalDays Int             @default(0)
-  easeFactor   Float           @default(2.5)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  question     Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  id              String          @id @default(cuid())
+  questionId      String          @unique
+  wrongCount      Int             @default(1)
+  lastWrongAt     DateTime        @default(now())
+  reviewedAt      DateTime?
+  exportedAt      DateTime?
+  manuallyAddedAt DateTime?
+  status          WrongNoteStatus @default(ACTIVE)
+  dueAt           DateTime?
+  intervalDays    Int             @default(0)
+  easeFactor      Float           @default(2.5)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  question        Question        @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@index([status, lastWrongAt])
   @@index([dueAt])
@@ -322,6 +324,7 @@ model StudyMemo {
   sourceSessionId      String?
   sourceQuestionId     String?
   sourceConversationId String?
+  exportedAt           DateTime?
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   sourceSession        StudySession?   @relation(fields: [sourceSessionId], references: [id], onDelete: SetNull)

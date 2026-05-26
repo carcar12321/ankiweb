@@ -32,6 +32,7 @@ export default async function MemosPage() {
         memos={memos.map((memo) => ({
           content: memo.content,
           createdAt: memo.createdAt.toISOString(),
+          exportedAt: memo.exportedAt?.toISOString() ?? null,
           id: memo.id,
           sourceConversationTitle: memo.sourceConversation?.title ?? null,
           sourceQuestionPrompt: memo.sourceQuestion?.prompt ?? null,

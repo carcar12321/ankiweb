@@ -1,0 +1,3 @@
+ALTER TABLE "WrongNote" ADD COLUMN "exportedAt" TIMESTAMP(3);
+ALTER TABLE "WrongNote" ADD COLUMN "manuallyAddedAt" TIMESTAMP(3);
+ALTER TABLE "StudyMemo" ADD COLUMN "exportedAt" TIMESTAMP(3);

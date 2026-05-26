@@ -3,11 +3,14 @@ import {
   BookOpen,
   ClipboardList,
   FileUp,
+  FolderOpen,
   Shuffle
 } from "lucide-react";
 import Link from "next/link";
 
+import { RecommendedPartStartButton } from "@/components/recommended-part-start-button";
 import { TodayReviewCard } from "@/components/today-review-card";
+import { getCategoryKey } from "@/lib/categories";
 import { prisma } from "@/lib/prisma";
 import {
   getWeakPartRecommendations,
@@ -48,6 +51,7 @@ export default async function DashboardPage() {
     }),
     prisma.question.findMany({
       select: {
+        category: true,
         studyState: {
           select: { dueAt: true }
         }
@@ -84,6 +88,20 @@ export default async function DashboardPage() {
       rating: log.rating
     }))
   );
+  const allSetIds = allSets.map((set) => set.id);
+  const questionCountsByCategory = reviewCandidates.reduce((counts, question) => {
+    const key = getCategoryKey(question.category);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+  const recommendedParts = weakParts.map((part) => {
+    const questionCount = questionCountsByCategory.get(getCategoryKey(part.category)) ?? 0;
+
+    return {
+      ...part,
+      startCount: Math.min(20, questionCount)
+    };
+  });
   const todayStartCount =
     reviewLoad.dueCount > 0 ? reviewLoad.dueCount : Math.min(20, reviewLoad.newCount);
 
@@ -135,19 +153,19 @@ export default async function DashboardPage() {
           dueCount={reviewLoad.dueCount}
           newCount={reviewLoad.newCount}
           overdueCount={reviewLoad.overdueCount}
-          setIds={allSets.map((set) => set.id)}
+          setIds={allSetIds}
           startCount={todayStartCount}
         />
 
         <section className="panel">
           <p className="eyebrow">RECOMMENDED PARTS</p>
           <h2>오늘 추천 part</h2>
-          {weakParts.length === 0 ? (
+          {recommendedParts.length === 0 ? (
             <div className="empty">아직 추천할 취약 part가 없습니다.</div>
           ) : (
             <div className="set-list">
-              {weakParts.map((part) => (
-                <div className="study-row" key={part.part}>
+              {recommendedParts.map((part) => (
+                <div className="study-row study-row-action" key={part.part}>
                   <div>
                     <h3>{part.part}</h3>
                     <div className="pill-row">
@@ -158,6 +176,11 @@ export default async function DashboardPage() {
                       <span className="pill">Hard {part.hard}</span>
                     </div>
                   </div>
+                  <RecommendedPartStartButton
+                    category={part.category}
+                    setIds={allSetIds}
+                    startCount={part.startCount}
+                  />
                 </div>
               ))}
             </div>
@@ -167,7 +190,13 @@ export default async function DashboardPage() {
 
       <section className="grid grid-2">
         <div className="panel">
-          <h2>최근 문제집</h2>
+          <div className="panel-heading">
+            <h2>최근 문제집</h2>
+            <Link className="button-ghost" href="/files">
+              <FolderOpen size={17} />
+              더보기
+            </Link>
+          </div>
           {recentSets.length === 0 ? (
             <div className="empty">아직 문제집이 없습니다.</div>
           ) : (

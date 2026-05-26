@@ -1,6 +1,12 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, RotateCcw, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Download,
+  RotateCcw,
+  XCircle
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -17,6 +23,8 @@ type WrongNoteItem = {
   id: string;
   wrongCount: number;
   lastWrongAt: string;
+  exportedAt?: string | null;
+  manuallyAddedAt?: string | null;
   question: {
     choiceOrder?: string;
     id: string;
@@ -52,8 +60,12 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
   const [selected, setSelected] = useState<Choice | null>(null);
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [pending, setPending] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [reviewed, setReviewed] = useState(0);
   const current = queue[index];
+  const selectedExportCount = selectedNoteIds.length;
 
   async function submit() {
     if (!selected || !current) {
@@ -100,6 +112,9 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
         );
 
     setQueue(nextQueue);
+    setSelectedNoteIds((items) =>
+      items.filter((id) => nextQueue.some((note) => note.id === id))
+    );
     setIndex((value) => Math.min(value + 1, Math.max(nextQueue.length - 1, 0)));
     setSelected(null);
     setResult(null);
@@ -123,6 +138,63 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
     setSelected(null);
     setResult(null);
     setReviewed(0);
+    setSelectedNoteIds([]);
+  }
+
+  function toggleNote(id: string) {
+    setSelectedNoteIds((currentIds) =>
+      currentIds.includes(id)
+        ? currentIds.filter((item) => item !== id)
+        : [...currentIds, id]
+    );
+  }
+
+  function selectAllForExport() {
+    setSelectedNoteIds(queue.map((note) => note.id));
+  }
+
+  function clearExportSelection() {
+    setSelectedNoteIds([]);
+  }
+
+  async function exportSelected() {
+    if (selectedNoteIds.length === 0) {
+      return;
+    }
+
+    setExporting(true);
+    setExportError(null);
+
+    const response = await fetch("/api/exports/wrong-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selectedNoteIds })
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+      setExporting(false);
+      setExportError(body?.message ?? "오답노트를 export하지 못했습니다.");
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const exportedAt = new Date().toISOString();
+    link.href = url;
+    link.download = "wrong-notes-selected.md";
+    link.click();
+    window.URL.revokeObjectURL(url);
+    setQueue((items) =>
+      items.map((note) =>
+        selectedNoteIds.includes(note.id) ? { ...note, exportedAt } : note
+      )
+    );
+    setSelectedNoteIds([]);
+    setExporting(false);
   }
 
   if (notes.length === 0) {
@@ -153,7 +225,14 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
               {current.question.tag ? (
                 <span className="pill">{current.question.tag}</span>
               ) : null}
-              <span className="pill">오답 {current.wrongCount}회</span>
+              {current.manuallyAddedAt ? (
+                <span className="pill">직접 추가</span>
+              ) : (
+                <span className="pill">오답 {current.wrongCount}회</span>
+              )}
+              {current.exportedAt ? (
+                <span className="pill success-pill">이미 export됨</span>
+              ) : null}
             </div>
             <div className="question-prompt">{current.question.prompt}</div>
             <div className="choice-grid">
@@ -229,25 +308,77 @@ export function WrongNotesPanel({ notes }: { notes: WrongNoteItem[] }) {
       )}
 
       <section className="panel">
-        <h2>현재 오답 목록</h2>
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">EXPORT</p>
+            <h2>현재 오답 목록</h2>
+          </div>
+          <span className="pill">{selectedExportCount}개 선택</span>
+        </div>
+        <div className="actions" style={{ marginBottom: 14 }}>
+          <button className="button-ghost" onClick={selectAllForExport} type="button">
+            전체 선택
+          </button>
+          <button className="button-ghost" onClick={clearExportSelection} type="button">
+            선택 해제
+          </button>
+          <button
+            className="button"
+            disabled={exporting || selectedExportCount === 0}
+            onClick={exportSelected}
+            type="button"
+          >
+            <Download size={17} />
+            {exporting ? "Export 중" : "Markdown 다운로드"}
+          </button>
+        </div>
+        {exportError ? <div className="status-box error">{exportError}</div> : null}
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>선택</th>
                 <th>세트</th>
                 <th>문제</th>
                 <th>오답</th>
-                <th>최근 오답</th>
+                <th>최근 오답/추가</th>
+                <th>Export</th>
               </tr>
             </thead>
             <tbody>
               {queue.map((note) => (
                 <tr key={note.id}>
+                  <td data-label="선택">
+                    <label className="table-check">
+                      <input
+                        checked={selectedNoteIds.includes(note.id)}
+                        onChange={() => toggleNote(note.id)}
+                        type="checkbox"
+                      />
+                      <span>선택</span>
+                    </label>
+                  </td>
                   <td data-label="세트">{note.question.setTitle}</td>
                   <td data-label="문제">{note.question.prompt}</td>
-                  <td data-label="오답">{note.wrongCount}회</td>
-                  <td data-label="최근 오답">
+                  <td data-label="오답">
+                    {note.manuallyAddedAt ? (
+                      <span className="pill">직접 추가</span>
+                    ) : (
+                      `${note.wrongCount}회`
+                    )}
+                  </td>
+                  <td data-label="최근 오답/추가">
                     {new Date(note.lastWrongAt).toLocaleDateString("ko-KR")}
+                  </td>
+                  <td data-label="Export">
+                    {note.exportedAt ? (
+                      <span className="pill success-pill">
+                        이미 export됨{" "}
+                        {new Date(note.exportedAt).toLocaleDateString("ko-KR")}
+                      </span>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
                   </td>
                 </tr>
               ))}

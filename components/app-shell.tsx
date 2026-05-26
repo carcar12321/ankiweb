@@ -4,6 +4,7 @@ import {
   BookOpen,
   Bot,
   FileUp,
+  FolderOpen,
   Home,
   Moon,
   NotebookPen,
@@ -38,6 +39,7 @@ const navItems = [
   { href: "/ai-study", label: "AI 학습", icon: Bot },
   { href: "/memos", label: "메모장", icon: NotebookPen },
   { href: "/upload", label: "업로드", icon: FileUp },
+  { href: "/files", label: "파일관리자", icon: FolderOpen },
   { href: "/wrong-notes", label: "오답노트", icon: BookOpen },
   { href: "/generated-questions", label: "AI 초안", icon: Sparkles }
 ];

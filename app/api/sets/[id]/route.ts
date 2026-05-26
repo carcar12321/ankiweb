@@ -53,3 +53,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   return NextResponse.json({ ok: true, set });
 }
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const { id } = await context.params;
+  const deleted = await prisma.questionSet
+    .delete({
+      where: { id },
+      select: { id: true }
+    })
+    .catch(() => null);
+
+  if (!deleted) {
+    return NextResponse.json(
+      { ok: false, message: "문제집을 찾을 수 없습니다." },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
+}

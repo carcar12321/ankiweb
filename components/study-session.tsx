@@ -152,6 +152,7 @@ export function StudySession({
   );
   const [pending, setPending] = useState(false);
   const [pendingRating, setPendingRating] = useState<ReviewRating | null>(null);
+  const [keepInWrongNotes, setKeepInWrongNotes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const current = questionQueue[index];
   const complete = index >= questionQueue.length;
@@ -213,6 +214,7 @@ export function StudySession({
     );
     setResult(body);
     setSelected(body.selectedChoice);
+    setKeepInWrongNotes(false);
   }
 
   async function rate(rating: ReviewRating) {
@@ -227,6 +229,7 @@ export function StudySession({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        keepInWrongNotes: result.isCorrect && keepInWrongNotes,
         questionId: current.id,
         rating
       })
@@ -275,6 +278,7 @@ export function StudySession({
     });
     setSelected(null);
     setResult(null);
+    setKeepInWrongNotes(false);
     setIndex(body.complete ? body.totalQuestions : body.currentIndex);
   }
 
@@ -432,6 +436,19 @@ export function StudySession({
               정답: <strong>{result.correctChoice}</strong>
             </p>
             {result.explanation ? <p>{result.explanation}</p> : null}
+            {result.isCorrect ? (
+              <label className="select-check keep-wrong-note">
+                <input
+                  checked={keepInWrongNotes}
+                  disabled={Boolean(pendingRating)}
+                  onChange={(event) =>
+                    setKeepInWrongNotes(event.currentTarget.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>오답노트에 보관</span>
+              </label>
+            ) : null}
             <div className="rating-grid" aria-label="자가평가">
               {ratingOptions.map((option) => {
                 const Icon = option.icon;

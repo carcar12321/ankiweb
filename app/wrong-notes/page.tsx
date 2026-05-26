@@ -34,6 +34,8 @@ export default async function WrongNotesPage() {
           id: note.id,
           wrongCount: note.wrongCount,
           lastWrongAt: note.lastWrongAt.toISOString(),
+          exportedAt: note.exportedAt?.toISOString() ?? null,
+          manuallyAddedAt: note.manuallyAddedAt?.toISOString() ?? null,
           question: {
             id: note.question.id,
             prompt: note.question.prompt,
